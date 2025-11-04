@@ -1,0 +1,75 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Output of the go build command
+/bin/
+/build/
+/out/
+/dist/
+/target/
+
+# Go coverage and profiling files
+*.out
+*.prof
+coverage.*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+*.old
+
+# Dependency directories (if vendored)
+vendor/
+
+# Environment / configuration
+.env
+.env.*
+!.env.example
+
+# IDE and editor files
+.vscode/
+.idea/
+*.iml
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Go workspace files (if using Go modules)
+go.work
+go.work.sum
+
+# Docker artifacts
+*.tar
+docker-compose.override.yml
+*.pid
+
+# Database / local test data
+*.db
+*.sqlite
+*.sql
+*.csv
+*.json
+
+# Temporary cache files
+/tmp/
+.cache/
+
+# Test or data dumps
+/testdata/*
+/data/*
+!testdata/*.go  # Keep Go files in testdata

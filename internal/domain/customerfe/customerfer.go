@@ -1,0 +1,124 @@
+package customerfe
+
+import "time"
+
+type CustomerFE struct {
+	CustomerCode      string
+	CustomerName      string
+	Address           string
+	CityName          string
+	BankCountry       string
+	Regio             string
+	TransZone         string
+	Telephone         string
+	Bran1             string
+	Bran2             string
+	Bran3             string
+	ChannelIc4        string
+	Vtext             string
+	Katr1             string
+	Katr2             string
+	Katr3             string
+	Adrnr             string
+	Vkorg             string
+	SalesOffice       string
+	SalesDistrict     string
+	CustomerGrp1      string
+	CustGrp1Desc      string
+	CustomerGrp2      string
+	ShippingCondition string
+	Lprio             string
+	Branch            string
+	Eikto             string
+	Ktokd             string
+	FlagDeletion      string
+	Sperr1            string
+	Aufsd1            string
+	Lifsd1            string
+	Faksd1            string
+	Cassd1            string
+	Erdat             *time.Time
+	Ernam             string
+	PostalCode        string
+}
+
+func NewCustomerFE(
+	customerCode string,
+	customerName string,
+	address string,
+	cityName string,
+	bankCountry string,
+	regio string,
+	transZone string,
+	telephone string,
+	bran1 string,
+	bran2 string,
+	bran3 string,
+	channelIc4 string,
+	vtext string,
+	katr1 string,
+	katr2 string,
+	katr3 string,
+	adrnr string,
+	vkorg string,
+	salesOffice string,
+	salesDistrict string,
+	customerGrp1 string,
+	custGrp1Desc string,
+	customerGrp2 string,
+	shippingCondition string,
+	lprio string,
+	branch string,
+	eikto string,
+	ktokd string,
+	flagDeletion string,
+	sperr1 string,
+	aufsd1 string,
+	lifsd1 string,
+	faksd1 string,
+	cassd1 string,
+	ernam string,
+	postalCode string,
+) *CustomerFE {
+	now := time.Now()
+
+	return &CustomerFE{
+		CustomerCode:      customerCode,
+		CustomerName:      customerName,
+		Address:           address,
+		CityName:          cityName,
+		BankCountry:       bankCountry,
+		Regio:             regio,
+		TransZone:         transZone,
+		Telephone:         telephone,
+		Bran1:             bran1,
+		Bran2:             bran2,
+		Bran3:             bran3,
+		ChannelIc4:        channelIc4,
+		Vtext:             vtext,
+		Katr1:             katr1,
+		Katr2:             katr2,
+		Katr3:             katr3,
+		Adrnr:             adrnr,
+		Vkorg:             vkorg,
+		SalesOffice:       salesOffice,
+		SalesDistrict:     salesDistrict,
+		CustomerGrp1:      customerGrp1,
+		CustGrp1Desc:      custGrp1Desc,
+		CustomerGrp2:      customerGrp2,
+		ShippingCondition: shippingCondition,
+		Lprio:             lprio,
+		Branch:            branch,
+		Eikto:             eikto,
+		Ktokd:             ktokd,
+		FlagDeletion:      flagDeletion,
+		Sperr1:            sperr1,
+		Aufsd1:            aufsd1,
+		Lifsd1:            lifsd1,
+		Faksd1:            faksd1,
+		Cassd1:            cassd1,
+		Erdat:             &now,
+		Ernam:             ernam,
+		PostalCode:        postalCode,
+	}
+}
