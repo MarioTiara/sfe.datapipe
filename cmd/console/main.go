@@ -7,7 +7,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/mariotiara/sfe-data-pipe/internal/application/customerfe"
+	materialmaster "github.com/mariotiara/sfe-data-pipe/internal/application/material_master"
 	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/excel"
 	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/postgres"
 )
@@ -19,10 +19,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	filePath := "data/202509_SFE_CustomersList.XLSX"
+	filePath := "data/202509_SFE_Tablemaster_Material.xlsx"
 	defer db.Close()
 
-	excelData, err := excel.ReadFeCustomerFromExcel(filePath)
+	excelData, err := excel.ReadMaterialMasterFromExcel(filePath)
 	if err != nil {
 		log.Fatal("error reading excel:", err)
 	}
@@ -30,10 +30,10 @@ func main() {
 	for _, data := range excelData {
 		fmt.Printf("%+v\n", data)
 	}
-	repo := postgres.NewCustomerRepository(db)
-	service := customerfe.NewService(repo)
+	repo := postgres.NewMaterialMasterRepository(db)
+	service := materialmaster.NewService(repo)
 
-	if err := service.ImportCustomers(excelData); err != nil {
+	if err := service.ImportMaterials(excelData); err != nil {
 		log.Fatal("error importing data:", err)
 	}
 
