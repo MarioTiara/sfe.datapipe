@@ -6,10 +6,6 @@ import (
 	"log"
 
 	_ "github.com/lib/pq"
-
-	"github.com/mariotiara/sfe-data-pipe/internal/application/ezengagecalldetail"
-	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/excel"
-	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/postgres"
 )
 
 func main() {
@@ -19,25 +15,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	filePath := "data/202509_Call Detailed eZEngage.xlsx"
-	defer db.Close()
 
-	excelData, err := excel.ReadEZEngageCallDetailFromExcel(filePath)
-	if err != nil {
-		log.Fatal("error reading excel:", err)
-	}
+	ezengage := NewEZEngagePipeline(db)
+	ezengage.Run()
 
-	// for _, data := range excelData {
-	// 	fmt.Printf("%+v\n", data)
-	// }
+	salesfe := NewSalesFEPipeline(db)
+	salesfe.Run()
 
-	fmt.Println(len((excelData)))
-	repo := postgres.NewEZEngageCallDetailRepository(db)
-	service := ezengagecalldetail.NewService(repo)
+	hirarki := NewHirarkiPipeline(db)
+	hirarki.Run()
 
-	if err := service.ImportCallDetails(excelData); err != nil {
-		log.Fatal("error importing data:", err)
-	}
+	masteroutlet := NewMasterOutletPipeline(db)
+	masteroutlet.Run()
 
-	fmt.Println("Data importted successfully")
+	materialmaster := NewMaterialMasterPipeline(db)
+	materialmaster.Run()
+
+	customerfe := NewCustomerFEPipeline(db)
+	customerfe.Run()
+
 }

@@ -1,6 +1,7 @@
 package masteroutlet
 
 type MasterOutlet struct {
+	ID                string
 	CustomerCode      string
 	CustomerName      string
 	Channel           string

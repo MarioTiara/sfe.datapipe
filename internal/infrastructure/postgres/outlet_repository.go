@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	masteroutlet "github.com/mariotiara/sfe-data-pipe/internal/domain/master_outlet"
 )
@@ -13,6 +14,57 @@ type MasterOutletRepository struct {
 
 func NewMasterOutletRepository(db *sql.DB) *MasterOutletRepository {
 	return &MasterOutletRepository{db: db}
+}
+
+func (r *MasterOutletRepository) RemoveThisMonthData() (int, error) {
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	year, month := now.Year(), now.Month()
+
+	query := `
+		DELETE FROM master_outlet
+		WHERE EXTRACT (YEAR FROM created_at)=$1
+		AND EXTRACT (MONTH FROM created_at)=$2
+		RETURNING 1
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, year, month)
+	if err != nil {
+		return 0, err
+	}
+
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		count++
+	}
+
+	return count, nil
+}
+
+func (r *MasterOutletRepository) HasThisMonthData() (bool, error) {
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	year, month := now.Year(), now.Month()
+
+	query := `
+		SELECT COUNT(1)
+		FROM master_outlet
+		WHERE EXTRACT (YEAR FROM created_at)=$1
+		AND EXTRACT (MONTH FROM created_at)=$2
+	`
+	var count int
+
+	err := r.db.QueryRowContext(ctx, query, year, month).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+
 }
 
 func (r *MasterOutletRepository) Save(m masteroutlet.MasterOutlet) error {

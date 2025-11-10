@@ -1,0 +1,7 @@
+package ezengagecalldetail
+
+import "github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
+
+type CallDetailMapper interface {
+	MapRowsToCallDetails(rows <-chan []string) (<-chan *ezengagecalldetail.EZEngageCallDetail, <-chan error)
+}
