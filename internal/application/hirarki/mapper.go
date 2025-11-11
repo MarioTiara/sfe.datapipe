@@ -5,5 +5,5 @@ import (
 )
 
 type HirarkiMapper interface {
-	MapRowsToCallDetails(rows <-chan []string) (<-chan *hirarki.Hirarki, <-chan error)
+	MapRowsToHirarki(rows <-chan []string) ([]*hirarki.Hirarki, error)
 }

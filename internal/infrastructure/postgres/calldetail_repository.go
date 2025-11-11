@@ -4,17 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
 )
 
 type EZEngageCallDetailRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	config *configs.Config
 }
 
-func NewEZEngageCallDetailRepository(db *sql.DB) *EZEngageCallDetailRepository {
-	return &EZEngageCallDetailRepository{db: db}
+func NewEZEngageCallDetailRepository(db *sql.DB, config *configs.Config) *EZEngageCallDetailRepository {
+	return &EZEngageCallDetailRepository{db: db, config: config}
 }
 
 func (r *EZEngageCallDetailRepository) RemoveThisMonthData() (int, error) {
@@ -68,7 +71,7 @@ func (r *EZEngageCallDetailRepository) HasThisMonthData() (bool, error) {
 
 }
 
-func (r *EZEngageCallDetailRepository) Save(e ezengagecalldetail.EZEngageCallDetail) error {
+func (r *EZEngageCallDetailRepository) Save(e *ezengagecalldetail.EZEngageCallDetail) error {
 	ctx := context.Background()
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -188,8 +191,8 @@ func (r *EZEngageCallDetailRepository) Save(e ezengagecalldetail.EZEngageCallDet
 	return tx.Commit()
 }
 
-func (r *EZEngageCallDetailRepository) SaveRange(details []ezengagecalldetail.EZEngageCallDetail) error {
-	const batchSize = 1000 // commit every 1000 records
+func (r *EZEngageCallDetailRepository) SaveRange(details []*ezengagecalldetail.EZEngageCallDetail) error {
+	batchSize := r.config.DBBatchSize
 
 	ctx := context.Background()
 
@@ -200,7 +203,7 @@ func (r *EZEngageCallDetailRepository) SaveRange(details []ezengagecalldetail.EZ
 		}
 
 		msg := fmt.Sprintf("insert %d of %d", i, len(details))
-		fmt.Println(msg)
+		log.Println(msg)
 		batch := details[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -263,7 +266,7 @@ func (r *EZEngageCallDetailRepository) SaveRange(details []ezengagecalldetail.EZ
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		fmt.Printf("✅ Committed batch %d–%d successfully\n", i, end)
+		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
 	}
 
 	return nil

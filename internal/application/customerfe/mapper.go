@@ -5,5 +5,5 @@ import (
 )
 
 type CustomerFEMapper interface {
-	MapRowsToCustomerFE(rows <-chan []string) (<-chan *customerfe.CustomerFE, <-chan error)
+	MapRowsToCustomerFE(rows <-chan []string) ([]*customerfe.CustomerFE, error)
 }

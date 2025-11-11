@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 type LocalFolderLoader struct {
@@ -19,41 +20,46 @@ func NewLocalFolderLoader(parser FileParser, path string) *LocalFolderLoader {
 }
 
 func (l *LocalFolderLoader) StreamRows() (<-chan []string, <-chan error) {
-	dataCh := make(chan []string)
-	errCh := make(chan error, 1)
+	dataCh := make(chan []string, 100)
+	errCh := make(chan error, 10)
 
 	go func() {
 		defer close(dataCh)
 		defer close(errCh)
 
 		files, err := os.ReadDir(l.Path)
-		mess := fmt.Sprintf("files found: %d", len(files))
-		fmt.Println(mess)
 		if err != nil {
 			errCh <- err
 			return
 		}
+
+		var wg sync.WaitGroup
 
 		for _, f := range files {
 			if f.IsDir() {
 				continue
 			}
 
-			fullPath := filepath.Join(l.Path, f.Name())
-			rowsCh, parserErrCh := l.Parser.Parse(fullPath)
-			mess := fmt.Sprintf("files found: %s", fullPath)
-			fmt.Println(mess)
-			for row := range rowsCh {
-				dataCh <- row
-			}
+			wg.Add(1)
+			go func(fileName string) {
+				defer wg.Done()
 
-			if err := <-parserErrCh; err != nil {
-				errCh <- fmt.Errorf("file %s: %w", f.Name(), err)
-				return
-			}
+				rowsCh, parserErrCh := l.Parser.Parse(filepath.Join(l.Path, fileName))
+
+				for row := range rowsCh {
+					dataCh <- row
+				}
+
+				for perr := range parserErrCh {
+					if perr != nil {
+						errCh <- fmt.Errorf("file %s: %w", fileName, perr)
+					}
+				}
+			}(f.Name())
 		}
+
+		wg.Wait() // wait for all file parsers to finish
 	}()
 
-	fmt.Println("local data loader finished")
 	return dataCh, errCh
 }

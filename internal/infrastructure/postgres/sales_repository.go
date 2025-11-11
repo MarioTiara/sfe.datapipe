@@ -3,17 +3,23 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"log"
 	"time"
 
+	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/salesfe"
 )
 
+var config, _ = configs.Load()
+
 type SalesRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	config *configs.Config
 }
 
-func NewSalesRepository(db *sql.DB) *SalesRepository {
-	return &SalesRepository{db: db}
+func NewSalesRepository(db *sql.DB, config *configs.Config) *SalesRepository {
+	return &SalesRepository{db: db, config: config}
 }
 
 func (r *SalesRepository) RemoveThisMonthData() (int, error) {
@@ -67,7 +73,7 @@ func (r *SalesRepository) HasThisMonthData() (bool, error) {
 
 }
 
-func (r *SalesRepository) Save(sale salesfe.SalesFE) error {
+func (r *SalesRepository) Save(sale *salesfe.SalesFE) error {
 	ctx := context.Background()
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -110,49 +116,65 @@ func (r *SalesRepository) Save(sale salesfe.SalesFE) error {
 	return tx.Commit()
 }
 
-func (r *SalesRepository) SaveRange(sales []salesfe.SalesFE) error {
+func (r *SalesRepository) SaveRange(sales []*salesfe.SalesFE) error {
+	batchSize := r.config.DBBatchSize
+
 	ctx := context.Background()
-	tx, err := r.db.BeginTx(ctx, nil)
-
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO sales_fe (
-			invoice_date, po_number, po_type, po_type_desc, customer_code, customer_name,
-			channel_ic1, channel_ic1_description, channel_ic4, channel_ic4_description,
-			plant, branch, principal, product_group, item_code, item_name,
-			sales, net_sales, sales_unit, bonus_unit, bun1
-		) VALUES (
-			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10,
-			$11, $12, $13, $14, $15, $16,
-			$17, $18, $19, $20, $21
-		)
-
-	`)
-
-	if err != nil {
-		return err
-	}
-
-	defer stmt.Close()
-
-	for _, s := range sales {
-		_, err := stmt.ExecContext(ctx,
-			s.InvoiceDate, s.PONumber, s.POType, s.POTypeDesc, s.CustomerCode,
-			s.CustomerName, s.ChannelIC1, s.ChannelIC1Description, s.ChannelIC4,
-			s.ChannelIC4Description, s.Plant, s.Branch, s.Principal, s.ProductGroup,
-			s.ItemCode, s.ItemName, s.Sales, s.NetSales, s.SalesUnit, s.BonusUnit, s.BUN1,
-		)
-
-		if err != nil {
-			return err
+	for i := 0; i < len(sales); i += batchSize {
+		end := i + batchSize
+		if end > len(sales) {
+			end = len(sales)
 		}
+
+		msg := fmt.Sprintf("insert %d of %d", i, len(sales))
+		log.Println(msg)
+		batch := sales[i:end]
+
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("begin tx: %w", err)
+		}
+
+		stmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO sales_fe (
+				invoice_date, po_number, po_type, po_type_desc, customer_code, customer_name,
+				channel_ic1, channel_ic1_description, channel_ic4, channel_ic4_description,
+				plant, branch, principal, product_group, item_code, item_name,
+				sales, net_sales, sales_unit, bonus_unit, bun1
+			) VALUES (
+				$1, $2, $3, $4, $5, $6,
+				$7, $8, $9, $10,
+				$11, $12, $13, $14, $15, $16,
+				$17, $18, $19, $20, $21
+			)
+
+		`)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("prepare stmt: %w", err)
+		}
+
+		for _, s := range batch {
+			_, err := stmt.ExecContext(ctx,
+				s.InvoiceDate, s.PONumber, s.POType, s.POTypeDesc, s.CustomerCode,
+				s.CustomerName, s.ChannelIC1, s.ChannelIC1Description, s.ChannelIC4,
+				s.ChannelIC4Description, s.Plant, s.Branch, s.Principal, s.ProductGroup,
+				s.ItemCode, s.ItemName, s.Sales, s.NetSales, s.SalesUnit, s.BonusUnit, s.BUN1,
+			)
+			if err != nil {
+				stmt.Close()
+				tx.Rollback()
+				return fmt.Errorf("exec batch insert: %w", err)
+			}
+		}
+
+		stmt.Close()
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit batch: %w", err)
+		}
+
+		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
 	}
 
-	return tx.Commit()
+	return nil
 }

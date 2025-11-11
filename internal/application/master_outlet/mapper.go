@@ -5,5 +5,5 @@ import (
 )
 
 type MasterOutletMapper interface {
-	MapRowsToMasterOutlet(rows <-chan []string) (<-chan *masteroutlet.MasterOutlet, <-chan error)
+	MapRowsToMasterOutlet(rows <-chan []string) ([]*masteroutlet.MasterOutlet, error)
 }

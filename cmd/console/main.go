@@ -1,37 +1,38 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
 	_ "github.com/lib/pq"
+	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/postgres"
 )
 
 func main() {
 	fmt.Println("start")
-	connStr := "postgres://postgres:secret@localhost:5432/mydb?sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
+
+	db, err := postgres.NewPostgressDB()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to start connection to database")
+		return
 	}
 
-	ezengage := NewEZEngagePipeline(db)
-	ezengage.Run()
+	// ezengage := NewEZEngagePipeline(db)
+	// ezengage.Run()
 
 	salesfe := NewSalesFEPipeline(db)
 	salesfe.Run()
 
-	hirarki := NewHirarkiPipeline(db)
-	hirarki.Run()
+	// hirarki := NewHirarkiPipeline(db)
+	// hirarki.Run()
 
-	masteroutlet := NewMasterOutletPipeline(db)
-	masteroutlet.Run()
+	// masteroutlet := NewMasterOutletPipeline(db)
+	// masteroutlet.Run()
 
-	materialmaster := NewMaterialMasterPipeline(db)
-	materialmaster.Run()
+	// materialmaster := NewMaterialMasterPipeline(db)
+	// materialmaster.Run()
 
-	customerfe := NewCustomerFEPipeline(db)
-	customerfe.Run()
+	// customerfe := NewCustomerFEPipeline(db)
+	// customerfe.Run()
 
 }

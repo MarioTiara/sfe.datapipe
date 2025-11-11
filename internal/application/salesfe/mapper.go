@@ -5,5 +5,5 @@ import (
 )
 
 type SalesFEMapper interface {
-	MapRowsToSaleFE(rows <-chan []string) (<-chan *salesfe.SalesFE, <-chan error)
+	MapRowsToSaleFE(rows <-chan []string) ([]*salesfe.SalesFE, error)
 }

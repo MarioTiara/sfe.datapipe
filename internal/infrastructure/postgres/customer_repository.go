@@ -3,17 +3,21 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"log"
 	"time"
 
+	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/customerfe"
 )
 
 type CustomerRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	config *configs.Config
 }
 
-func NewCustomerRepository(db *sql.DB) *CustomerRepository {
-	return &CustomerRepository{db: db}
+func NewCustomerRepository(db *sql.DB, config *configs.Config) *CustomerRepository {
+	return &CustomerRepository{db: db, config: config}
 }
 
 func (r *CustomerRepository) RemoveThisMonthData() (int, error) {
@@ -68,7 +72,7 @@ func (r *CustomerRepository) HasThisMonthData() (bool, error) {
 }
 
 // Save inserts a single customer record
-func (r *CustomerRepository) Save(customer customerfe.CustomerFE) error {
+func (r *CustomerRepository) Save(customer *customerfe.CustomerFE) error {
 	ctx := context.Background()
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -117,15 +121,26 @@ func (r *CustomerRepository) Save(customer customerfe.CustomerFE) error {
 }
 
 // SaveRange inserts multiple customer records efficiently in a single transaction
-func (r *CustomerRepository) SaveRange(customers []customerfe.CustomerFE) error {
-	ctx := context.Background()
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+func (r *CustomerRepository) SaveRange(customers []*customerfe.CustomerFE) error {
+	batchSize := r.config.DBBatchSize
 
-	stmt, err := tx.PrepareContext(ctx, `
+	ctx := context.Background()
+	for i := 0; i < len(customers); i += batchSize {
+		end := i + batchSize
+		if end > len(customers) {
+			end = len(customers)
+		}
+
+		msg := fmt.Sprintf("insert %d of %d", i, len(customers))
+		log.Println(msg)
+		batch := customers[i:end]
+
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("begin tx: %w", err)
+		}
+
+		stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO customer_fe (
 			customer_code, customer_name, address, city_name, bank_country,
 			regio, trans_zone, telephone, bran1, bran2, bran3,
@@ -144,25 +159,35 @@ func (r *CustomerRepository) SaveRange(customers []customerfe.CustomerFE) error 
 			$34, $35, $36, $37
 		)
 	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	for _, c := range customers {
-		_, err := stmt.ExecContext(ctx,
-			c.CustomerCode, c.CustomerName, c.Address, c.CityName, c.BankCountry,
-			c.Regio, c.TransZone, c.Telephone, c.Bran1, c.Bran2, c.Bran3,
-			c.ChannelIc4, c.Vtext, c.Katr1, c.Katr2, c.Katr3, c.Adrnr, c.Vkorg,
-			c.SalesOffice, c.SalesDistrict, c.CustomerGrp1, c.CustGrp1Desc,
-			c.CustomerGrp2, c.ShippingCondition, c.Lprio, c.Branch, c.Eikto,
-			c.Ktokd, c.FlagDeletion, c.Sperr1, c.Aufsd1, c.Lifsd1, c.Faksd1,
-			c.Cassd1, c.Erdat, c.Ernam, c.PostalCode,
-		)
 		if err != nil {
-			return err
+			tx.Rollback()
+			return fmt.Errorf("prepare stmt: %w", err)
 		}
+
+		for _, c := range batch {
+			_, err := stmt.ExecContext(ctx,
+				c.CustomerCode, c.CustomerName, c.Address, c.CityName, c.BankCountry,
+				c.Regio, c.TransZone, c.Telephone, c.Bran1, c.Bran2, c.Bran3,
+				c.ChannelIc4, c.Vtext, c.Katr1, c.Katr2, c.Katr3, c.Adrnr, c.Vkorg,
+				c.SalesOffice, c.SalesDistrict, c.CustomerGrp1, c.CustGrp1Desc,
+				c.CustomerGrp2, c.ShippingCondition, c.Lprio, c.Branch, c.Eikto,
+				c.Ktokd, c.FlagDeletion, c.Sperr1, c.Aufsd1, c.Lifsd1, c.Faksd1,
+				c.Cassd1, c.Erdat, c.Ernam, c.PostalCode,
+			)
+			if err != nil {
+				stmt.Close()
+				tx.Rollback()
+				return fmt.Errorf("exec batch insert: %w", err)
+			}
+		}
+
+		stmt.Close()
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit batch: %w", err)
+		}
+
+		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
 	}
 
-	return tx.Commit()
+	return nil
 }

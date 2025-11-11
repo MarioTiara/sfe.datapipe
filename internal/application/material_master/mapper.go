@@ -5,5 +5,5 @@ import (
 )
 
 type MaterialMasterMapper interface {
-	MapRowsToMaterialMaster(rows <-chan []string) (<-chan *materialmaster.MaterialMaster, <-chan error)
+	MapRowsToMaterialMaster(rows <-chan []string) ([]*materialmaster.MaterialMaster, error)
 }

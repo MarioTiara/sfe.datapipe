@@ -1,1 +1,0 @@
-migrate -path db/migrations -database "postgres://postgres:secret@localhost:5432/mydb?sslmode=disable" up

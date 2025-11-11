@@ -12,20 +12,29 @@ func (e *ExcelParser) Parse(filePath string) (<-chan []string, <-chan error) {
 	dataCh := make(chan []string)
 	errCh := make(chan error, 1)
 
-	fmt.Println("start parsing excel")
 	go func() {
 		defer close(dataCh)
 		defer close(errCh)
 
 		f, err := excelize.OpenFile(filePath)
 		if err != nil {
-			errCh <- err
+			errCh <- fmt.Errorf("open file: %w", err)
 			return
 		}
 
-		rows, err := f.GetRows("Sheet1")
+		// Get all sheet names
+		sheetList := f.GetSheetList()
+		if len(sheetList) == 0 {
+			errCh <- fmt.Errorf("no sheets found")
+		}
+
+		// Use the first sheet
+		firstSheet := sheetList[0]
+
+		// Get all rows from the first sheet
+		rows, err := f.GetRows(firstSheet)
 		if err != nil {
-			errCh <- err
+			errCh <- fmt.Errorf("get rows: %w", err)
 			return
 		}
 
@@ -34,6 +43,5 @@ func (e *ExcelParser) Parse(filePath string) (<-chan []string, <-chan error) {
 		}
 	}()
 
-	fmt.Println("Parsing excel Done")
 	return dataCh, errCh
 }

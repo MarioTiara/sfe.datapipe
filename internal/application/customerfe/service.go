@@ -2,6 +2,7 @@ package customerfe
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/application/shared"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/customerfe"
@@ -18,45 +19,37 @@ func NewService(repo customerfe.Repository, streamer shared.StreamDataSource, ma
 }
 
 func (s *Service) Run() error {
+	// Stream rows from the loader
 	rowsCh, loaderErrCh := s.streamer.StreamRows()
 
-	entityCh, mapErrCh := s.mapper.MapRowsToCustomerFE(rowsCh)
-
-	entities := []customerfe.CustomerFE{}
-
-	for {
-		select {
-		case e, ok := <-entityCh:
-			if !ok {
-				entityCh = nil
-				continue
+	// Collect any loader errors in a separate goroutine
+	go func() {
+		for err := range loaderErrCh {
+			if err != nil {
+				log.Printf("Loader error: %v\n", err)
 			}
-			entities = append(entities, *e)
-		case err, ok := <-loaderErrCh:
-			if ok {
-				fmt.Println("Loader error:", err)
-			}
-			loaderErrCh = nil
-
-		case err, ok := <-mapErrCh:
-			if ok {
-				fmt.Println("Mapping error:", err)
-			}
-			mapErrCh = nil
 		}
+	}()
 
-		if entityCh == nil && loaderErrCh == nil && mapErrCh == nil {
-			break
-		}
+	// Map rows to entities (this returns a slice now)
+	entities, err := s.mapper.MapRowsToCustomerFE(rowsCh)
+	if err != nil {
+		return fmt.Errorf("failed to map rows: %w", err)
 	}
 
+	log.Printf("Total entities collected: %d\n", len(entities))
+
+	// Save entities to repository
 	return s.saveData(entities)
 }
 
-func (s *Service) saveData(data []customerfe.CustomerFE) error {
+func (s *Service) saveData(data []*customerfe.CustomerFE) error {
 	hasData, _ := s.repo.HasThisMonthData()
 	if hasData {
-		s.repo.RemoveThisMonthData()
+		row, _ := s.repo.RemoveThisMonthData()
+		ms := fmt.Sprintf("%d is removed", row)
+		log.Println(ms)
 	}
+
 	return s.repo.SaveRange(data)
 }
