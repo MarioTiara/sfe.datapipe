@@ -1,8 +1,10 @@
 package salesfe
 
+import "context"
+
 type Repository interface {
-	Save(sale *SalesFE) error
-	SaveRange(sales []*SalesFE) error
-	HasThisMonthData() (bool, error)
-	RemoveThisMonthData() (int, error)
+	Save(ctx context.Context, sale *SalesFE) error
+	SaveRange(ctx context.Context, sales []*SalesFE) error
+	HasThisMonthData(ctx context.Context) (bool, error)
+	RemoveThisMonthData(ctx context.Context) (int, error)
 }

@@ -4,27 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/salesfe"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 var config, _ = configs.Load()
 
 type SalesRepository struct {
+	logger logger.Logger
 	db     *sql.DB
 	config *configs.Config
 }
 
-func NewSalesRepository(db *sql.DB, config *configs.Config) *SalesRepository {
-	return &SalesRepository{db: db, config: config}
+func NewSalesRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *SalesRepository {
+	return &SalesRepository{db: db, config: config, logger: logger}
 }
 
-func (r *SalesRepository) RemoveThisMonthData() (int, error) {
-	ctx := context.Background()
-
+func (r *SalesRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -50,8 +49,7 @@ func (r *SalesRepository) RemoveThisMonthData() (int, error) {
 	return count, nil
 }
 
-func (r *SalesRepository) HasThisMonthData() (bool, error) {
-	ctx := context.Background()
+func (r *SalesRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
@@ -73,8 +71,7 @@ func (r *SalesRepository) HasThisMonthData() (bool, error) {
 
 }
 
-func (r *SalesRepository) Save(sale *salesfe.SalesFE) error {
-	ctx := context.Background()
+func (r *SalesRepository) Save(ctx context.Context, sale *salesfe.SalesFE) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -116,18 +113,16 @@ func (r *SalesRepository) Save(sale *salesfe.SalesFE) error {
 	return tx.Commit()
 }
 
-func (r *SalesRepository) SaveRange(sales []*salesfe.SalesFE) error {
+func (r *SalesRepository) SaveRange(ctx context.Context, sales []*salesfe.SalesFE) error {
 	batchSize := r.config.DBBatchSize
 
-	ctx := context.Background()
 	for i := 0; i < len(sales); i += batchSize {
 		end := i + batchSize
 		if end > len(sales) {
 			end = len(sales)
 		}
 
-		msg := fmt.Sprintf("insert %d of %d", i, len(sales))
-		log.Println(msg)
+		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(sales)))
 		batch := sales[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -173,7 +168,7 @@ func (r *SalesRepository) SaveRange(sales []*salesfe.SalesFE) error {
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
+		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
 	}
 
 	return nil

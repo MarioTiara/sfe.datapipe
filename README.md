@@ -1,4 +1,4 @@
-# 📦 Go Data Pipeline Project
+# 📦 SFE Datapipe
 
 ## 📝 Project Description
 This project is a Go-based data pipeline designed to load, transform, and store data from multiple sources into a database.  

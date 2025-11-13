@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
+	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/logger"
 	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/postgres"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/processid"
 )
 
 func main() {
@@ -13,15 +15,16 @@ func main() {
 
 	db, err := postgres.NewPostgressDB()
 	if err != nil {
-		log.Fatal("failed to start connection to database")
+		// log.Fatal("failed to start connection to database")
 		return
 	}
+	exLogger := logger.NewZapLogger()
+	ctx := processid.WithContext(context.Background())
+	ezengage := NewEZEngagePipeline(ctx, db, exLogger)
+	ezengage.Run(ctx)
 
-	// ezengage := NewEZEngagePipeline(db)
-	// ezengage.Run()
-
-	salesfe := NewSalesFEPipeline(db)
-	salesfe.Run()
+	// salesfe := NewSalesFEPipeline(db)
+	// salesfe.Run()
 
 	// hirarki := NewHirarkiPipeline(db)
 	// hirarki.Run()

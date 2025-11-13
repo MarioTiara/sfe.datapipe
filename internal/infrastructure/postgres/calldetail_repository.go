@@ -4,25 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type EZEngageCallDetailRepository struct {
+	logger logger.Logger
 	db     *sql.DB
 	config *configs.Config
 }
 
-func NewEZEngageCallDetailRepository(db *sql.DB, config *configs.Config) *EZEngageCallDetailRepository {
-	return &EZEngageCallDetailRepository{db: db, config: config}
+func NewEZEngageCallDetailRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *EZEngageCallDetailRepository {
+	return &EZEngageCallDetailRepository{db: db, config: config, logger: logger}
 }
 
-func (r *EZEngageCallDetailRepository) RemoveThisMonthData() (int, error) {
-	ctx := context.Background()
-
+func (r *EZEngageCallDetailRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -48,9 +47,7 @@ func (r *EZEngageCallDetailRepository) RemoveThisMonthData() (int, error) {
 	return count, nil
 }
 
-func (r *EZEngageCallDetailRepository) HasThisMonthData() (bool, error) {
-	ctx := context.Background()
-
+func (r *EZEngageCallDetailRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -71,8 +68,7 @@ func (r *EZEngageCallDetailRepository) HasThisMonthData() (bool, error) {
 
 }
 
-func (r *EZEngageCallDetailRepository) Save(e *ezengagecalldetail.EZEngageCallDetail) error {
-	ctx := context.Background()
+func (r *EZEngageCallDetailRepository) Save(ctx context.Context, e *ezengagecalldetail.EZEngageCallDetail) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -191,19 +187,15 @@ func (r *EZEngageCallDetailRepository) Save(e *ezengagecalldetail.EZEngageCallDe
 	return tx.Commit()
 }
 
-func (r *EZEngageCallDetailRepository) SaveRange(details []*ezengagecalldetail.EZEngageCallDetail) error {
+func (r *EZEngageCallDetailRepository) SaveRange(ctx context.Context, details []*ezengagecalldetail.EZEngageCallDetail) error {
 	batchSize := r.config.DBBatchSize
-
-	ctx := context.Background()
-
 	for i := 0; i < len(details); i += batchSize {
 		end := i + batchSize
 		if end > len(details) {
 			end = len(details)
 		}
 
-		msg := fmt.Sprintf("insert %d of %d", i, len(details))
-		log.Println(msg)
+		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(details)))
 		batch := details[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -266,7 +258,7 @@ func (r *EZEngageCallDetailRepository) SaveRange(details []*ezengagecalldetail.E
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
+		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
 	}
 
 	return nil

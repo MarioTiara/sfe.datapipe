@@ -1,47 +1,50 @@
 package hirarki
 
 import (
+	"context"
 	"fmt"
-	"log"
 
-	"github.com/mariotiara/sfe-data-pipe/internal/application/shared"
+	"github.com/mariotiara/sfe-data-pipe/internal/application/datastream"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/hirarki"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type Service struct {
+	logger   logger.Logger
 	repo     hirarki.Repository
-	streamer shared.StreamDataSource
+	streamer datastream.DataStream
 	mapper   HirarkiMapper
 }
 
-func NewService(repo hirarki.Repository, streamer shared.StreamDataSource, mapper HirarkiMapper) *Service {
-	return &Service{repo: repo, streamer: streamer, mapper: mapper}
+func NewService(repo hirarki.Repository, streamer datastream.DataStream, mapper HirarkiMapper, logger logger.Logger) *Service {
+	return &Service{repo: repo, streamer: streamer, mapper: mapper, logger: logger}
 }
 
-func (s *Service) Run() error {
-	rowsCh, loaderErrCh := s.streamer.StreamRows()
+func (s *Service) Run(ctx context.Context) error {
+	rowsCh, loaderErrCh := s.streamer.StreamRows(ctx)
 	go func() {
 		for err := range loaderErrCh {
 			if err != nil {
-				log.Printf("Loader error: %v\n", err)
+				s.logger.Error(ctx, "Loader error: %v\n", err)
 			}
 		}
 	}()
 
 	entities, err := s.mapper.MapRowsToHirarki(rowsCh)
 	if err != nil {
-		return fmt.Errorf("failed to map rows: %w", err)
+		s.logger.Error(ctx, "failed to map rows: %v", err)
+		return err
 	}
 
-	log.Printf("Total entities collected: %d\n", len(entities))
+	s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
 
-	return s.saveData(entities)
+	return s.saveData(ctx, entities)
 }
 
-func (s *Service) saveData(data []*hirarki.Hirarki) error {
-	hasData, _ := s.repo.HasThisMonthData()
+func (s *Service) saveData(ctx context.Context, data []*hirarki.Hirarki) error {
+	hasData, _ := s.repo.HasThisMonthData(ctx)
 	if hasData {
-		s.repo.RemoveThisMonthData()
+		s.repo.RemoveThisMonthData(ctx)
 	}
-	return s.repo.SaveRange(data)
+	return s.repo.SaveRange(ctx, data)
 }

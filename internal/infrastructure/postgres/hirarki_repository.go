@@ -4,25 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/hirarki"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type HirarkiRepository struct {
+	logger logger.Logger
 	db     *sql.DB
 	config *configs.Config
 }
 
-func NewHirarkiRepository(db *sql.DB, config *configs.Config) *HirarkiRepository {
-	return &HirarkiRepository{db: db, config: config}
+func NewHirarkiRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *HirarkiRepository {
+	return &HirarkiRepository{db: db, config: config, logger: logger}
 }
 
-func (r *HirarkiRepository) HasThisMonthData() (bool, error) {
-	ctx := context.Background()
-
+func (r *HirarkiRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -43,9 +42,7 @@ func (r *HirarkiRepository) HasThisMonthData() (bool, error) {
 
 }
 
-func (r *HirarkiRepository) RemoveThisMonthData() (int, error) {
-	ctx := context.Background()
-
+func (r *HirarkiRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -71,8 +68,7 @@ func (r *HirarkiRepository) RemoveThisMonthData() (int, error) {
 	return count, nil
 }
 
-func (r *HirarkiRepository) Save(h *hirarki.Hirarki) error {
-	ctx := context.Background()
+func (r *HirarkiRepository) Save(ctx context.Context, h *hirarki.Hirarki) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -110,17 +106,15 @@ func (r *HirarkiRepository) Save(h *hirarki.Hirarki) error {
 	return tx.Commit()
 }
 
-func (r *HirarkiRepository) SaveRange(hs []*hirarki.Hirarki) error {
+func (r *HirarkiRepository) SaveRange(ctx context.Context, hs []*hirarki.Hirarki) error {
 	batchSize := r.config.DBBatchSize
-	ctx := context.Background()
 	for i := 0; i < len(hs); i += batchSize {
 		end := i + batchSize
 		if end > len(hs) {
 			end = len(hs)
 		}
 
-		msg := fmt.Sprintf("insert %d of %d", i, len(hs))
-		log.Println(msg)
+		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(hs)))
 		batch := hs[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -165,7 +159,7 @@ func (r *HirarkiRepository) SaveRange(hs []*hirarki.Hirarki) error {
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
+		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
 
 	}
 
