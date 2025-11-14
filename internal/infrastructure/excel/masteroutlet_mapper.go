@@ -1,14 +1,22 @@
 package excel
 
-import masteroutlet "github.com/mariotiara/sfe-data-pipe/internal/domain/master_outlet"
+import (
+	"context"
+	"fmt"
 
-type excelMasterOutletMapper struct{}
+	masteroutlet "github.com/mariotiara/sfe-data-pipe/internal/domain/master_outlet"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
+)
 
-func NewExcelMasterOutletMapper() *excelMasterOutletMapper {
-	return &excelMasterOutletMapper{}
+type excelMasterOutletMapper struct {
+	logger logger.Logger
 }
 
-func (m *excelMasterOutletMapper) MapRowsToMasterOutlet(rows <-chan []string) ([]*masteroutlet.MasterOutlet, error) {
+func NewExcelMasterOutletMapper(logger logger.Logger) *excelMasterOutletMapper {
+	return &excelMasterOutletMapper{logger: logger}
+}
+
+func (m *excelMasterOutletMapper) MapRowsToMasterOutlet(ctx context.Context, rows <-chan []string) ([]*masteroutlet.MasterOutlet, error) {
 
 	var result []*masteroutlet.MasterOutlet
 
@@ -36,6 +44,6 @@ func (m *excelMasterOutletMapper) MapRowsToMasterOutlet(rows <-chan []string) ([
 
 		result = append(result, m)
 	}
-
+	m.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(result)))
 	return result, nil
 }

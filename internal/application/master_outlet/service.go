@@ -3,7 +3,6 @@ package masteroutlet
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/application/datastream"
 	masteroutlet "github.com/mariotiara/sfe-data-pipe/internal/domain/master_outlet"
@@ -31,13 +30,12 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}()
 
-	entities, err := s.mapper.MapRowsToMasterOutlet(rowsCh)
+	entities, err := s.mapper.MapRowsToMasterOutlet(ctx, rowsCh)
 	if err != nil {
 		s.logger.Error(ctx, "failed to map rows: %v", err)
 		return err
 	}
 
-	log.Printf("Total entities collected: %d\n", len(entities))
 	s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
 	return s.saveData(ctx, entities)
 }
@@ -45,6 +43,7 @@ func (s *Service) Run(ctx context.Context) error {
 func (s *Service) saveData(ctx context.Context, data []*masteroutlet.MasterOutlet) error {
 	hasData, _ := s.repo.HasThisMonthData(ctx)
 	if hasData {
+		s.logger.Info(ctx, "Existing data found for the same month; old records will be removed")
 		s.repo.RemoveThisMonthData(ctx)
 	}
 	return s.repo.SaveRange(ctx, data)

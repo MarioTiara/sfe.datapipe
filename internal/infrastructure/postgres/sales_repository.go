@@ -115,14 +115,12 @@ func (r *SalesRepository) Save(ctx context.Context, sale *salesfe.SalesFE) error
 
 func (r *SalesRepository) SaveRange(ctx context.Context, sales []*salesfe.SalesFE) error {
 	batchSize := r.config.DBBatchSize
-
+	tinserted := 0
 	for i := 0; i < len(sales); i += batchSize {
 		end := i + batchSize
 		if end > len(sales) {
 			end = len(sales)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(sales)))
 		batch := sales[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -167,9 +165,9 @@ func (r *SalesRepository) SaveRange(ctx context.Context, sales []*salesfe.SalesF
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit batch: %w", err)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
+		tinserted = end
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(sales), tinserted))
 	return nil
 }

@@ -2,7 +2,7 @@ package hirarki
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/application/datastream"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/hirarki"
@@ -21,6 +21,8 @@ func NewService(repo hirarki.Repository, streamer datastream.DataStream, mapper 
 }
 
 func (s *Service) Run(ctx context.Context) error {
+	start := time.Now()
+	s.logger.Info(ctx, "Hirarki Pipeline Started")
 	rowsCh, loaderErrCh := s.streamer.StreamRows(ctx)
 	go func() {
 		for err := range loaderErrCh {
@@ -30,20 +32,28 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}()
 
-	entities, err := s.mapper.MapRowsToHirarki(rowsCh)
+	entities, err := s.mapper.MapRowsToHirarki(ctx, rowsCh)
 	if err != nil {
 		s.logger.Error(ctx, "failed to map rows: %v", err)
 		return err
 	}
 
-	s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
+	err = s.saveData(ctx, entities)
+	if err != nil {
+		s.logger.Error(ctx, "Hirarki Pipeline Failed", err,
+			logger.Field{Key: "process_time", Value: time.Since(start).String()},
+		)
+		return err
+	}
 
-	return s.saveData(ctx, entities)
+	s.logger.Info(ctx, "Hirarki Pipeline Process Done", logger.Field{Key: "process_time", Value: time.Since(start).String()})
+	return nil
 }
 
 func (s *Service) saveData(ctx context.Context, data []*hirarki.Hirarki) error {
 	hasData, _ := s.repo.HasThisMonthData(ctx)
 	if hasData {
+		s.logger.Info(ctx, "Existing data found for the same month; old records will be removed")
 		s.repo.RemoveThisMonthData(ctx)
 	}
 	return s.repo.SaveRange(ctx, data)

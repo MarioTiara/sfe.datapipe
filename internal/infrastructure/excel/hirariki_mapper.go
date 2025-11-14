@@ -1,18 +1,27 @@
 package excel
 
-import "github.com/mariotiara/sfe-data-pipe/internal/domain/hirarki"
+import (
+	"context"
+	"fmt"
 
-type excelHirarkiMapper struct{}
+	"github.com/mariotiara/sfe-data-pipe/internal/domain/hirarki"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
+)
 
-func NewHirarkiExcelMapper() *excelHirarkiMapper {
+type excelHirarkiMapper struct {
+	logger logger.Logger
+}
+
+func NewHirarkiExcelMapper(logger logger.Logger) *excelHirarkiMapper {
 	return &excelHirarkiMapper{}
 }
 
-func (m *excelHirarkiMapper) MapRowsToHirarki(rows <-chan []string) ([]*hirarki.Hirarki, error) {
+func (m *excelHirarkiMapper) MapRowsToHirarki(ctx context.Context, rows <-chan []string) ([]*hirarki.Hirarki, error) {
 	var result []*hirarki.Hirarki
+	m.logger.Info(ctx, "mapping streams to entities")
 	for row := range rows {
 		if len(row) == 0 {
-			continue // skip empty rows
+			continue
 		}
 
 		h := &hirarki.Hirarki{
@@ -43,5 +52,6 @@ func (m *excelHirarkiMapper) MapRowsToHirarki(rows <-chan []string) ([]*hirarki.
 		result = append(result, h)
 	}
 
+	m.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(result)))
 	return result, nil
 }

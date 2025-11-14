@@ -105,14 +105,12 @@ func (r *MasterOutletRepository) Save(ctx context.Context, m *masteroutlet.Maste
 
 func (r *MasterOutletRepository) SaveRange(ctx context.Context, ms []*masteroutlet.MasterOutlet) error {
 	batchSize := r.config.DBBatchSize
+	tinserted := 0
 	for i := 0; i < len(ms); i += batchSize {
 		end := i + batchSize
 		if end > len(ms) {
 			end = len(ms)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(ms)))
-
 		batch := ms[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -153,9 +151,9 @@ func (r *MasterOutletRepository) SaveRange(ctx context.Context, ms []*masteroutl
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit batch: %w", err)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
 	}
+
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(ms), tinserted))
 
 	return nil
 }

@@ -1,7 +1,6 @@
-package main
+package app
 
 import (
-	"context"
 	"database/sql"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
@@ -17,61 +16,59 @@ import (
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
-var config, _ = configs.Load()
-
-func NewEZEngagePipeline(ctx context.Context, db *sql.DB, logger logger.Logger) *ezengagecalldetail.Service {
+func NewEZEngagePipeline(db *sql.DB, config *configs.Config, logger logger.Logger) *ezengagecalldetail.Service {
 	filepath := config.EZEngageCallPath
 	repo := postgres.NewEZEngageCallDetailRepository(db, config, logger)
 	parser := &excel.ExcelParser{}
 	streamer := shared.NewLocalFolderLoader(logger, parser, filepath)
-	mapper := excel.NewExcelEZEnggaeCallDetailMapper()
+	mapper := excel.NewExcelEZEnggaeCallDetailMapper(logger)
 	service := ezengagecalldetail.NewService(repo, streamer, mapper, logger)
 	return service
 }
-func NewCustomerFEPipeline(ctx context.Context, db *sql.DB, logger logger.Logger) *customerfe.Service {
+func NewCustomerFEPipeline(db *sql.DB, config *configs.Config, logger logger.Logger) *customerfe.Service {
 	filepath := config.CustomerfePath
 	repo := postgres.NewCustomerRepository(db, config, logger)
 	parser := &excel.ExcelParser{}
 	streamer := shared.NewLocalFolderLoader(logger, parser, filepath)
-	mapper := excel.NewExcelCustomerFEMapper()
+	mapper := excel.NewExcelCustomerFEMapper(logger)
 	service := customerfe.NewService(repo, streamer, mapper, logger)
 	return service
 }
-func NewHirarkiPipeline(ctx context.Context, db *sql.DB, logger logger.Logger) *hirarki.Service {
+func NewHirarkiPipeline(db *sql.DB, config *configs.Config, logger logger.Logger) *hirarki.Service {
 	filepath := config.CustomerfePath
 	repo := postgres.NewHirarkiRepository(db, config, logger)
 	parser := &excel.ExcelParser{}
 	streamer := shared.NewLocalFolderLoader(logger, parser, filepath)
-	mapper := excel.NewHirarkiExcelMapper()
+	mapper := excel.NewHirarkiExcelMapper(logger)
 	service := hirarki.NewService(repo, streamer, mapper, logger)
 	return service
 }
-func NewSalesFEPipeline(ctx context.Context, db *sql.DB, logger logger.Logger) *salesfe.Service {
+func NewSalesFEPipeline(db *sql.DB, config *configs.Config, logger logger.Logger) *salesfe.Service {
 	filepath := config.SalesFEPath
 	repo := postgres.NewSalesRepository(db, config, logger)
 	parser := &excel.ExcelParser{}
 	streamer := shared.NewLocalFolderLoader(logger, parser, filepath)
-	mapper := excel.NewExcelSalesFEMapper()
+	mapper := excel.NewExcelSalesFEMapper(logger)
 	service := salesfe.NewService(repo, streamer, mapper, logger)
 	return service
 }
 
-func NewMaterialMasterPipeline(ctx context.Context, db *sql.DB, logger logger.Logger) *materialmaster.Service {
+func NewMaterialMasterPipeline(db *sql.DB, config *configs.Config, logger logger.Logger) *materialmaster.Service {
 	filepath := config.MasterMaterialPath
 	repo := postgres.NewMaterialMasterRepository(db, config, logger)
 	parser := &excel.ExcelParser{}
 	streamer := shared.NewLocalFolderLoader(logger, parser, filepath)
-	mapper := excel.NewExcelMaterialMasterMapper()
+	mapper := excel.NewExcelMaterialMasterMapper(logger)
 	service := materialmaster.NewService(repo, streamer, mapper, logger)
 	return service
 }
 
-func NewMasterOutletPipeline(ctx context.Context, db *sql.DB, logger logger.Logger) *masteroutlet.Service {
+func NewMasterOutletPipeline(db *sql.DB, config *configs.Config, logger logger.Logger) *masteroutlet.Service {
 	filepath := config.MasterOutletPath
 	repo := postgres.NewMasterOutletRepository(db, config, logger)
 	parser := &excel.ExcelParser{}
 	streamer := shared.NewLocalFolderLoader(logger, parser, filepath)
-	mapper := excel.NewExcelMasterOutletMapper()
+	mapper := excel.NewExcelMasterOutletMapper(logger)
 	service := masteroutlet.NewService(repo, streamer, mapper, logger)
 	return service
 }

@@ -119,13 +119,12 @@ func (r *CustomerRepository) Save(ctx context.Context, customer *customerfe.Cust
 // SaveRange inserts multiple customer records efficiently in a single transaction
 func (r *CustomerRepository) SaveRange(ctx context.Context, customers []*customerfe.CustomerFE) error {
 	batchSize := r.config.DBBatchSize
+	tinserted := 0
 	for i := 0; i < len(customers); i += batchSize {
 		end := i + batchSize
 		if end > len(customers) {
 			end = len(customers)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(customers)))
 		batch := customers[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -179,8 +178,8 @@ func (r *CustomerRepository) SaveRange(ctx context.Context, customers []*custome
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
+		tinserted = end
 	}
-
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(customers), tinserted))
 	return nil
 }

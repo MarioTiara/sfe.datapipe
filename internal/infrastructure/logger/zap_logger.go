@@ -2,7 +2,9 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 	"go.uber.org/zap"
@@ -21,17 +23,19 @@ func NewZapLogger() logger.Logger {
 	}
 
 	// 2. Setup lumberjack for rolling file
+	filename := fmt.Sprintf("logs/app-%s.log", time.Now().Format("2006-01-02"))
+
 	lumberJackLogger := &lumberjack.Logger{
-		Filename:   "logs/app.log", // log file
-		MaxSize:    1,              // megabytes per file
-		MaxBackups: 7,              // keep last 7 files
-		MaxAge:     30,             // days
-		Compress:   false,          // compress old files
+		Filename:   filename,
+		MaxSize:    10, // MB
+		MaxBackups: 7,
+		MaxAge:     30, // days
+		Compress:   false,
 	}
 
 	// 3. Encoder config
 	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:        "ts",
+		TimeKey:        "timestamp",
 		LevelKey:       "level",
 		NameKey:        "logger",
 		CallerKey:      "caller",

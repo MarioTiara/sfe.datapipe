@@ -114,13 +114,13 @@ func (r *MaterialMasterRepository) Save(ctx context.Context, m *materialmaster.M
 // SaveRange inserts multiple MaterialMaster records efficiently in a single transaction
 func (r *MaterialMasterRepository) SaveRange(ctx context.Context, materials []*materialmaster.MaterialMaster) error {
 	batchSize := r.config.DBBatchSize
+	tinserted := 0
 	for i := 0; i < len(materials); i += batchSize {
 		end := i + batchSize
 		if end > len(materials) {
 			end = len(materials)
 		}
 
-		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(materials)))
 		batch := materials[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -167,9 +167,9 @@ func (r *MaterialMasterRepository) SaveRange(ctx context.Context, materials []*m
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit batch: %w", err)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
+		tinserted = end
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(materials), tinserted))
 	return nil
 }

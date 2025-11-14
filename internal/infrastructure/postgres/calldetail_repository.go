@@ -189,13 +189,12 @@ func (r *EZEngageCallDetailRepository) Save(ctx context.Context, e *ezengagecall
 
 func (r *EZEngageCallDetailRepository) SaveRange(ctx context.Context, details []*ezengagecalldetail.EZEngageCallDetail) error {
 	batchSize := r.config.DBBatchSize
+	tinserted := 0
 	for i := 0; i < len(details); i += batchSize {
 		end := i + batchSize
 		if end > len(details) {
 			end = len(details)
 		}
-
-		r.logger.Info(ctx, fmt.Sprintf("insert %d of %d", i, len(details)))
 		batch := details[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -258,8 +257,9 @@ func (r *EZEngageCallDetailRepository) SaveRange(ctx context.Context, details []
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		r.logger.Info(ctx, fmt.Sprintf("✅ Committed batch %d–%d successfully\n", i, end))
+		tinserted = end
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(details), tinserted))
 	return nil
 }

@@ -1,9 +1,11 @@
 package salesfe
 
 import (
+	"context"
+
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/salesfe"
 )
 
 type SalesFEMapper interface {
-	MapRowsToSaleFE(rows <-chan []string) ([]*salesfe.SalesFE, error)
+	MapRowsToSaleFE(ctx context.Context, rows <-chan []string) ([]*salesfe.SalesFE, error)
 }

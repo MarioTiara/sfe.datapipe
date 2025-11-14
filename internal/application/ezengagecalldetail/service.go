@@ -3,7 +3,7 @@ package ezengagecalldetail
 import (
 	"context"
 	"fmt"
-	"log"
+	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/application/datastream"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
@@ -23,6 +23,9 @@ func NewService(repo ezengagecalldetail.Repository, streamer datastream.DataStre
 
 func (s *Service) Run(ctx context.Context) error {
 	// Stream rows from the loader
+	strat := time.Now()
+	s.logger.Info(ctx, "EZEngage Pipeline Started")
+
 	rowsCh, loaderErrCh := s.streamer.StreamRows(ctx)
 
 	// Collect any loader errors in a separate goroutine
@@ -35,7 +38,7 @@ func (s *Service) Run(ctx context.Context) error {
 	}()
 
 	// Map rows to entities (this returns a slice now)
-	entities, err := s.mapper.MapRowsToCallDetails(rowsCh)
+	entities, err := s.mapper.MapRowsToCallDetails(ctx, rowsCh)
 	if err != nil {
 		s.logger.Error(ctx, "failed to map rows: %v", err)
 		return err
@@ -44,15 +47,24 @@ func (s *Service) Run(ctx context.Context) error {
 	s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
 
 	// Save entities to repository
-	return s.saveData(ctx, entities)
+	err = s.saveData(ctx, entities)
+	if err != nil {
+		s.logger.Error(ctx, "EZEngage Failed", err,
+			logger.Field{Key: "process_time", Value: time.Since(strat).String()},
+		)
+		return err
+	}
+
+	s.logger.Info(ctx, "EZEngage Process Done", logger.Field{Key: "process_time", Value: time.Since(strat).String()})
+	return nil
+
 }
 
 func (s *Service) saveData(ctx context.Context, data []*ezengagecalldetail.EZEngageCallDetail) error {
 	hasData, _ := s.repo.HasThisMonthData(ctx)
 	if hasData {
-		row, _ := s.repo.RemoveThisMonthData(ctx)
-		ms := fmt.Sprintf("%d is removed", row)
-		log.Println(ms)
+		s.logger.Info(ctx, "Existing data found for the same month; old records will be removed")
+		s.repo.RemoveThisMonthData(ctx)
 	}
 
 	return s.repo.SaveRange(ctx, data)
