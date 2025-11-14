@@ -1,14 +1,22 @@
 package excel
 
-import materialmaster "github.com/mariotiara/sfe-data-pipe/internal/domain/material_master"
+import (
+	"context"
+	"fmt"
 
-type excelMaterialMasterMapper struct{}
+	materialmaster "github.com/mariotiara/sfe-data-pipe/internal/domain/material_master"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
+)
 
-func NewExcelMaterialMasterMapper() *excelMaterialMasterMapper {
-	return &excelMaterialMasterMapper{}
+type excelMaterialMasterMapper struct {
+	logger logger.Logger
 }
 
-func (m *excelMaterialMasterMapper) MapRowsToMaterialMaster(rows <-chan []string) ([]*materialmaster.MaterialMaster, error) {
+func NewExcelMaterialMasterMapper(logger logger.Logger) *excelMaterialMasterMapper {
+	return &excelMaterialMasterMapper{logger: logger}
+}
+
+func (m *excelMaterialMasterMapper) MapRowsToMaterialMaster(ctx context.Context, rows <-chan []string) ([]*materialmaster.MaterialMaster, error) {
 	var result []*materialmaster.MaterialMaster
 	for row := range rows {
 		if len(row) == 0 {
@@ -39,6 +47,6 @@ func (m *excelMaterialMasterMapper) MapRowsToMaterialMaster(rows <-chan []string
 
 		result = append(result, m)
 	}
-
+	m.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(result)))
 	return result, nil
 }

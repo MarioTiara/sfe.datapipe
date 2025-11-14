@@ -4,25 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/customerfe"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type CustomerRepository struct {
+	logger logger.Logger
 	db     *sql.DB
 	config *configs.Config
 }
 
-func NewCustomerRepository(db *sql.DB, config *configs.Config) *CustomerRepository {
-	return &CustomerRepository{db: db, config: config}
+func NewCustomerRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *CustomerRepository {
+	return &CustomerRepository{db: db, config: config, logger: logger}
 }
 
-func (r *CustomerRepository) RemoveThisMonthData() (int, error) {
-	ctx := context.Background()
-
+func (r *CustomerRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -48,9 +47,7 @@ func (r *CustomerRepository) RemoveThisMonthData() (int, error) {
 	return count, nil
 }
 
-func (r *CustomerRepository) HasThisMonthData() (bool, error) {
-	ctx := context.Background()
-
+func (r *CustomerRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -72,8 +69,7 @@ func (r *CustomerRepository) HasThisMonthData() (bool, error) {
 }
 
 // Save inserts a single customer record
-func (r *CustomerRepository) Save(customer *customerfe.CustomerFE) error {
-	ctx := context.Background()
+func (r *CustomerRepository) Save(ctx context.Context, customer *customerfe.CustomerFE) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -121,18 +117,14 @@ func (r *CustomerRepository) Save(customer *customerfe.CustomerFE) error {
 }
 
 // SaveRange inserts multiple customer records efficiently in a single transaction
-func (r *CustomerRepository) SaveRange(customers []*customerfe.CustomerFE) error {
+func (r *CustomerRepository) SaveRange(ctx context.Context, customers []*customerfe.CustomerFE) error {
 	batchSize := r.config.DBBatchSize
-
-	ctx := context.Background()
+	tinserted := 0
 	for i := 0; i < len(customers); i += batchSize {
 		end := i + batchSize
 		if end > len(customers) {
 			end = len(customers)
 		}
-
-		msg := fmt.Sprintf("insert %d of %d", i, len(customers))
-		log.Println(msg)
 		batch := customers[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -186,8 +178,8 @@ func (r *CustomerRepository) SaveRange(customers []*customerfe.CustomerFE) error
 			return fmt.Errorf("commit batch: %w", err)
 		}
 
-		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
+		tinserted = end
 	}
-
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(customers), tinserted))
 	return nil
 }

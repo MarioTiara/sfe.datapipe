@@ -4,25 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	materialmaster "github.com/mariotiara/sfe-data-pipe/internal/domain/material_master"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type MaterialMasterRepository struct {
+	logger logger.Logger
 	db     *sql.DB
 	config *configs.Config
 }
 
-func NewMaterialMasterRepository(db *sql.DB, config *configs.Config) *MaterialMasterRepository {
-	return &MaterialMasterRepository{db: db, config: config}
+func NewMaterialMasterRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *MaterialMasterRepository {
+	return &MaterialMasterRepository{db: db, config: config, logger: logger}
 }
 
-func (r *MaterialMasterRepository) RemoveThisMonthData() (int, error) {
-	ctx := context.Background()
-
+func (r *MaterialMasterRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -48,8 +47,7 @@ func (r *MaterialMasterRepository) RemoveThisMonthData() (int, error) {
 	return count, nil
 }
 
-func (r *MaterialMasterRepository) HasThisMonthData() (bool, error) {
-	ctx := context.Background()
+func (r *MaterialMasterRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
@@ -72,8 +70,7 @@ func (r *MaterialMasterRepository) HasThisMonthData() (bool, error) {
 }
 
 // Save inserts a single MaterialMaster record
-func (r *MaterialMasterRepository) Save(m *materialmaster.MaterialMaster) error {
-	ctx := context.Background()
+func (r *MaterialMasterRepository) Save(ctx context.Context, m *materialmaster.MaterialMaster) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -115,17 +112,15 @@ func (r *MaterialMasterRepository) Save(m *materialmaster.MaterialMaster) error 
 }
 
 // SaveRange inserts multiple MaterialMaster records efficiently in a single transaction
-func (r *MaterialMasterRepository) SaveRange(materials []*materialmaster.MaterialMaster) error {
+func (r *MaterialMasterRepository) SaveRange(ctx context.Context, materials []*materialmaster.MaterialMaster) error {
 	batchSize := r.config.DBBatchSize
-	ctx := context.Background()
+	tinserted := 0
 	for i := 0; i < len(materials); i += batchSize {
 		end := i + batchSize
 		if end > len(materials) {
 			end = len(materials)
 		}
 
-		msg := fmt.Sprintf("insert %d of %d", i, len(materials))
-		log.Println(msg)
 		batch := materials[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -172,9 +167,9 @@ func (r *MaterialMasterRepository) SaveRange(materials []*materialmaster.Materia
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit batch: %w", err)
 		}
-
-		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
+		tinserted = end
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(materials), tinserted))
 	return nil
 }

@@ -1,38 +1,43 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
-	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/postgres"
+	"github.com/mariotiara/sfe-data-pipe/app"
+	"github.com/mariotiara/sfe-data-pipe/configs"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/processid"
 )
 
 func main() {
-	fmt.Println("start")
 
-	db, err := postgres.NewPostgressDB()
+	ctx := context.Background()
+	config, err := configs.Load()
 	if err != nil {
-		log.Fatal("failed to start connection to database")
-		return
+		fmt.Println(err)
 	}
 
-	// ezengage := NewEZEngagePipeline(db)
-	// ezengage.Run()
+	app, err := app.NewApp(ctx, config)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	salesfe := NewSalesFEPipeline(db)
-	salesfe.Run()
+	ezctx := processid.WithContext(ctx)
+	app.EZEngagePipeLine.Run(ezctx)
 
-	// hirarki := NewHirarkiPipeline(db)
-	// hirarki.Run()
+	salesctx := processid.WithContext(ctx)
+	app.SalesFEPipeLine.Run(salesctx)
 
-	// masteroutlet := NewMasterOutletPipeline(db)
-	// masteroutlet.Run()
+	hctx := processid.WithContext(ctx)
+	app.HirarkiPipeLine.Run(hctx)
 
-	// materialmaster := NewMaterialMasterPipeline(db)
-	// materialmaster.Run()
+	moctx := processid.WithContext(ctx)
+	app.MasterOutletPipeline.Run(moctx)
 
-	// customerfe := NewCustomerFEPipeline(db)
-	// customerfe.Run()
+	mmctx := processid.WithContext(ctx)
+	app.MaterialPipeLine.Run(mmctx)
 
+	csctx := processid.WithContext(ctx)
+	app.CustomerFEPipeline.Run(csctx)
 }

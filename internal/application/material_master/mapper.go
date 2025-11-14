@@ -1,9 +1,11 @@
 package materialmaster
 
 import (
+	"context"
+
 	materialmaster "github.com/mariotiara/sfe-data-pipe/internal/domain/material_master"
 )
 
 type MaterialMasterMapper interface {
-	MapRowsToMaterialMaster(rows <-chan []string) ([]*materialmaster.MaterialMaster, error)
+	MapRowsToMaterialMaster(ctx context.Context, rows <-chan []string) ([]*materialmaster.MaterialMaster, error)
 }

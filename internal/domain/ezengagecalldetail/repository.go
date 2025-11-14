@@ -1,8 +1,10 @@
 package ezengagecalldetail
 
+import "context"
+
 type Repository interface {
-	Save(calldetail *EZEngageCallDetail) error
-	SaveRange(calldetail_list []*EZEngageCallDetail) error
-	HasThisMonthData() (bool, error)
-	RemoveThisMonthData() (int, error)
+	Save(ctx context.Context, calldetail *EZEngageCallDetail) error
+	SaveRange(ctx context.Context, calldetail_list []*EZEngageCallDetail) error
+	HasThisMonthData(ctx context.Context) (bool, error)
+	RemoveThisMonthData(ctx context.Context) (int, error)
 }

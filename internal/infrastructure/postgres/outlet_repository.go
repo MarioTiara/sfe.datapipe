@@ -4,25 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	masteroutlet "github.com/mariotiara/sfe-data-pipe/internal/domain/master_outlet"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type MasterOutletRepository struct {
+	logger logger.Logger
 	db     *sql.DB
 	config *configs.Config
 }
 
-func NewMasterOutletRepository(db *sql.DB, config *configs.Config) *MasterOutletRepository {
-	return &MasterOutletRepository{db: db, config: config}
+func NewMasterOutletRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *MasterOutletRepository {
+	return &MasterOutletRepository{db: db, config: config, logger: logger}
 }
 
-func (r *MasterOutletRepository) RemoveThisMonthData() (int, error) {
-	ctx := context.Background()
-
+func (r *MasterOutletRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -48,9 +47,7 @@ func (r *MasterOutletRepository) RemoveThisMonthData() (int, error) {
 	return count, nil
 }
 
-func (r *MasterOutletRepository) HasThisMonthData() (bool, error) {
-	ctx := context.Background()
-
+func (r *MasterOutletRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 	now := time.Now().UTC()
 	year, month := now.Year(), now.Month()
 
@@ -71,8 +68,7 @@ func (r *MasterOutletRepository) HasThisMonthData() (bool, error) {
 
 }
 
-func (r *MasterOutletRepository) Save(m *masteroutlet.MasterOutlet) error {
-	ctx := context.Background()
+func (r *MasterOutletRepository) Save(ctx context.Context, m *masteroutlet.MasterOutlet) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -107,18 +103,14 @@ func (r *MasterOutletRepository) Save(m *masteroutlet.MasterOutlet) error {
 	return tx.Commit()
 }
 
-func (r *MasterOutletRepository) SaveRange(ms []*masteroutlet.MasterOutlet) error {
+func (r *MasterOutletRepository) SaveRange(ctx context.Context, ms []*masteroutlet.MasterOutlet) error {
 	batchSize := r.config.DBBatchSize
-
-	ctx := context.Background()
+	tinserted := 0
 	for i := 0; i < len(ms); i += batchSize {
 		end := i + batchSize
 		if end > len(ms) {
 			end = len(ms)
 		}
-
-		msg := fmt.Sprintf("insert %d of %d", i, len(ms))
-		log.Println(msg)
 		batch := ms[i:end]
 
 		tx, err := r.db.BeginTx(ctx, nil)
@@ -159,9 +151,9 @@ func (r *MasterOutletRepository) SaveRange(ms []*masteroutlet.MasterOutlet) erro
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit batch: %w", err)
 		}
-
-		log.Printf("✅ Committed batch %d–%d successfully\n", i, end)
 	}
+
+	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(ms), tinserted))
 
 	return nil
 }

@@ -1,18 +1,23 @@
 package excel
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/customerfe"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
-type excelCustomerFEMapper struct{}
-
-func NewExcelCustomerFEMapper() *excelCustomerFEMapper {
-	return &excelCustomerFEMapper{}
+type excelCustomerFEMapper struct {
+	logger logger.Logger
 }
 
-func (m *excelCustomerFEMapper) MapRowsToCustomerFE(rows <-chan []string) ([]*customerfe.CustomerFE, error) {
+func NewExcelCustomerFEMapper(logger logger.Logger) *excelCustomerFEMapper {
+	return &excelCustomerFEMapper{logger: logger}
+}
+
+func (m *excelCustomerFEMapper) MapRowsToCustomerFE(ctx context.Context, rows <-chan []string) ([]*customerfe.CustomerFE, error) {
 	var result []*customerfe.CustomerFE
 	for row := range rows {
 		if len(row) == 0 {
@@ -68,6 +73,6 @@ func (m *excelCustomerFEMapper) MapRowsToCustomerFE(rows <-chan []string) ([]*cu
 		result = append(result, c)
 
 	}
-
+	m.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(result)))
 	return result, nil
 }

@@ -1,47 +1,50 @@
 package materialmaster
 
 import (
+	"context"
 	"fmt"
-	"log"
 
-	"github.com/mariotiara/sfe-data-pipe/internal/application/shared"
+	"github.com/mariotiara/sfe-data-pipe/internal/application/datastream"
 	materialmaster "github.com/mariotiara/sfe-data-pipe/internal/domain/material_master"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type Service struct {
+	logger   logger.Logger
 	repo     materialmaster.Repository
-	streamer shared.StreamDataSource
+	streamer datastream.DataStream
 	mapper   MaterialMasterMapper
 }
 
-func NewService(repo materialmaster.Repository, streamer shared.StreamDataSource, mapper MaterialMasterMapper) *Service {
+func NewService(repo materialmaster.Repository, streamer datastream.DataStream, mapper MaterialMasterMapper, logger logger.Logger) *Service {
 	return &Service{repo: repo, streamer: streamer, mapper: mapper}
 }
 
-func (s *Service) Run() error {
-	rowsCh, loaderErrCh := s.streamer.StreamRows()
+func (s *Service) Run(ctx context.Context) error {
+	rowsCh, loaderErrCh := s.streamer.StreamRows(ctx)
 	go func() {
 		for err := range loaderErrCh {
 			if err != nil {
-				log.Printf("Loader error: %v\n", err)
+				s.logger.Error(ctx, "Loader error: %v\n", err)
 			}
 		}
 	}()
 
-	entities, err := s.mapper.MapRowsToMaterialMaster(rowsCh)
+	entities, err := s.mapper.MapRowsToMaterialMaster(ctx, rowsCh)
 	if err != nil {
-		return fmt.Errorf("failed to map rows: %w", err)
+		s.logger.Error(ctx, "failed to map rows: %v", err)
+		return err
 	}
 
-	log.Printf("Total entities collected: %d\n", len(entities))
-
-	return s.saveData(entities)
+	s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
+	return s.saveData(ctx, entities)
 }
 
-func (s *Service) saveData(data []*materialmaster.MaterialMaster) error {
-	hasData, _ := s.repo.HasThisMonthData()
+func (s *Service) saveData(ctx context.Context, data []*materialmaster.MaterialMaster) error {
+	hasData, _ := s.repo.HasThisMonthData(ctx)
 	if hasData {
-		s.repo.RemoveThisMonthData()
+		s.repo.RemoveThisMonthData(ctx)
+		s.logger.Info(ctx, "Existing data found for the same month; old records will be removed")
 	}
-	return s.repo.SaveRange(data)
+	return s.repo.SaveRange(ctx, data)
 }

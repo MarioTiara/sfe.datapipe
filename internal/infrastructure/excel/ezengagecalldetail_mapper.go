@@ -1,16 +1,23 @@
 package excel
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
+	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
-type excelEZEnggaeCallDetailMapper struct{}
+type excelEZEnggaeCallDetailMapper struct {
+	logger logger.Logger
+}
 
-func NewExcelEZEnggaeCallDetailMapper() *excelEZEnggaeCallDetailMapper {
-	return &excelEZEnggaeCallDetailMapper{}
+func NewExcelEZEnggaeCallDetailMapper(logger logger.Logger) *excelEZEnggaeCallDetailMapper {
+	return &excelEZEnggaeCallDetailMapper{logger: logger}
 }
 
 func (m *excelEZEnggaeCallDetailMapper) MapRowsToCallDetails(
+	ctx context.Context,
 	rows <-chan []string,
 ) ([]*ezengagecalldetail.EZEngageCallDetail, error) {
 	var result []*ezengagecalldetail.EZEngageCallDetail
@@ -98,5 +105,6 @@ func (m *excelEZEnggaeCallDetailMapper) MapRowsToCallDetails(
 		result = append(result, e)
 	}
 
+	m.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(result)))
 	return result, nil
 }
