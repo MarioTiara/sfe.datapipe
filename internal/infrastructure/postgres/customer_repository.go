@@ -44,6 +44,7 @@ func (r *CustomerRepository) RemoveThisMonthData(ctx context.Context) (int, erro
 		count++
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d Rows has been removed", count))
 	return count, nil
 }
 

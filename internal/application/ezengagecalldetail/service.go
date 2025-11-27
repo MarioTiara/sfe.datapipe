@@ -63,7 +63,7 @@ func (s *Service) Run(ctx context.Context) error {
 func (s *Service) saveData(ctx context.Context, data []*ezengagecalldetail.EZEngageCallDetail) error {
 	hasData, _ := s.repo.HasThisMonthData(ctx)
 	if hasData {
-		s.logger.Info(ctx, "Existing data found for the same month; old records will be removed")
+		s.logger.Info(ctx, fmt.Sprintf("Existing data found for the same month; old records will be removed"))
 		s.repo.RemoveThisMonthData(ctx)
 	}
 

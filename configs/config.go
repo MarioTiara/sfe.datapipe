@@ -3,6 +3,8 @@ package configs
 import (
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -20,9 +22,20 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	err := godotenv.Load(".env")
+	// Get the directory of the current source file
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Println("Warning: unable to get caller info")
+	}
+
+	basePath := filepath.Dir(filename)
+	// Adjust if your .env is inside "configs" folder
+	envPath := filepath.Join(basePath, ".env")
+
+	// Load the .env file
+	err := godotenv.Load(envPath)
 	if err != nil {
-		log.Printf("Warning: .env not found: %v", err)
+		log.Printf("Warning: .env not found at %s: %v", envPath, err)
 	}
 
 	return &Config{

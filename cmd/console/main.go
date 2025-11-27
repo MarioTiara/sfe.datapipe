@@ -26,18 +26,18 @@ func main() {
 	ezctx := processid.WithContext(ctx)
 	app.EZEngagePipeLine.Run(ezctx)
 
-	salesctx := processid.WithContext(ctx)
-	app.SalesFEPipeLine.Run(salesctx)
+	// 	salesctx := processid.WithContext(ctx)
+	// 	app.SalesFEPipeLine.Run(salesctx)
 
-	hctx := processid.WithContext(ctx)
-	app.HirarkiPipeLine.Run(hctx)
+	// 	hctx := processid.WithContext(ctx)
+	// 	app.HirarkiPipeLine.Run(hctx)
 
-	moctx := processid.WithContext(ctx)
-	app.MasterOutletPipeline.Run(moctx)
+	// 	moctx := processid.WithContext(ctx)
+	// 	app.MasterOutletPipeline.Run(moctx)
 
-	mmctx := processid.WithContext(ctx)
-	app.MaterialPipeLine.Run(mmctx)
+	// 	mmctx := processid.WithContext(ctx)
+	// 	app.MaterialPipeLine.Run(mmctx)
 
-	csctx := processid.WithContext(ctx)
-	app.CustomerFEPipeline.Run(csctx)
+	// 	csctx := processid.WithContext(ctx)
+	// 	app.CustomerFEPipeline.Run(csctx)
 }

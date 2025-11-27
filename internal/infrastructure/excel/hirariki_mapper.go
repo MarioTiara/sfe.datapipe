@@ -13,7 +13,7 @@ type excelHirarkiMapper struct {
 }
 
 func NewHirarkiExcelMapper(logger logger.Logger) *excelHirarkiMapper {
-	return &excelHirarkiMapper{}
+	return &excelHirarkiMapper{logger: logger}
 }
 
 func (m *excelHirarkiMapper) MapRowsToHirarki(ctx context.Context, rows <-chan []string) ([]*hirarki.Hirarki, error) {
