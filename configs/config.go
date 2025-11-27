@@ -22,14 +22,22 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	_, filename, _, _ := runtime.Caller(0)
+	// Get the directory of the current source file
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		log.Println("Warning: unable to get caller info")
+	}
+
 	basePath := filepath.Dir(filename)
+	// Adjust if your .env is inside "configs" folder
 	envPath := filepath.Join(basePath, ".env")
 
+	// Load the .env file
 	err := godotenv.Load(envPath)
 	if err != nil {
-		log.Fatalf("Failed to load .env: %v", err)
+		log.Printf("Warning: .env not found at %s: %v", envPath, err)
 	}
+
 	return &Config{
 		ConnString:         getEnv("CONNECTION_STRING"),
 		CustomerfePath:     getEnv("CustomerfePath"),

@@ -44,6 +44,7 @@ func (r *EZEngageCallDetailRepository) RemoveThisMonthData(ctx context.Context) 
 		count++
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d Rows has been removed", count))
 	return count, nil
 }
 

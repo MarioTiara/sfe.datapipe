@@ -24,7 +24,7 @@ type App struct {
 }
 
 func NewApp(ctx context.Context, config *configs.Config) (*App, error) {
-	db, err := postgres.NewPostgressDB()
+	db, err := postgres.NewPostgressDB(config)
 	if err != nil {
 		return nil, err
 	}
