@@ -67,6 +67,7 @@ func (r *SalesRepository) HasThisMonthData(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d Rows has been removed", count))
 	return count > 0, nil
 
 }

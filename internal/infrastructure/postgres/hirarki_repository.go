@@ -65,6 +65,7 @@ func (r *HirarkiRepository) RemoveThisMonthData(ctx context.Context) (int, error
 		count++
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d Rows has been removed", count))
 	return count, nil
 }
 

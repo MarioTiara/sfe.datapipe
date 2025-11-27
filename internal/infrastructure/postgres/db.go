@@ -4,13 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+
+	"github.com/mariotiara/sfe-data-pipe/configs"
 )
 
-func NewPostgressDB() (*sql.DB, error) {
-	// config, _ := configs.Load()
-
+func NewPostgressDB(config *configs.Config) (*sql.DB, error) {
 	constr := config.ConnString
-	// constr := "postgres://postgres:secret@localhost:5432/mydb?sslmode=disable"
 	fmt.Println(constr)
 	db, err := sql.Open("postgres", constr)
 	if err != nil {

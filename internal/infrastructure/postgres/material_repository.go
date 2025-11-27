@@ -44,6 +44,7 @@ func (r *MaterialMasterRepository) RemoveThisMonthData(ctx context.Context) (int
 		count++
 	}
 
+	r.logger.Info(ctx, fmt.Sprintf("%d Rows has been removed", count))
 	return count, nil
 }
 
