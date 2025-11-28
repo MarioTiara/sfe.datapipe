@@ -191,6 +191,7 @@ func (r *EZEngageCallDetailRepository) Save(ctx context.Context, e *ezengagecall
 func (r *EZEngageCallDetailRepository) SaveRange(ctx context.Context, details []*ezengagecalldetail.EZEngageCallDetail) error {
 	batchSize := r.config.DBBatchSize
 	tinserted := 0
+	start := time.Now()
 	for i := 0; i < len(details); i += batchSize {
 		end := i + batchSize
 		if end > len(details) {
@@ -261,6 +262,7 @@ func (r *EZEngageCallDetailRepository) SaveRange(ctx context.Context, details []
 		tinserted = end
 	}
 
-	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(details), tinserted))
+	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
+		logger.Field{Key: "process_time", Value: time.Since(start).String()})
 	return nil
 }

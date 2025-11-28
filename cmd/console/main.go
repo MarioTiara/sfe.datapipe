@@ -2,25 +2,27 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	_ "github.com/lib/pq"
 	"github.com/mariotiara/sfe-data-pipe/app"
 	"github.com/mariotiara/sfe-data-pipe/configs"
+	"github.com/mariotiara/sfe-data-pipe/internal/infrastructure/logger"
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/processid"
 )
 
 func main() {
 
+	log := logger.NewZapLogger()
 	ctx := context.Background()
 	config, err := configs.Load()
 	if err != nil {
-		fmt.Println(err)
+		log.Error(ctx, "Failed to load config %v", err)
+		return
 	}
 
 	app, err := app.NewApp(ctx, config)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(ctx, "Failed to start app %v", err)
 	}
 
 	ezctx := processid.WithContext(ctx)

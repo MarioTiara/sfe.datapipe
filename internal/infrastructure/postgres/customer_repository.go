@@ -121,6 +121,7 @@ func (r *CustomerRepository) Save(ctx context.Context, customer *customerfe.Cust
 func (r *CustomerRepository) SaveRange(ctx context.Context, customers []*customerfe.CustomerFE) error {
 	batchSize := r.config.DBBatchSize
 	tinserted := 0
+	start := time.Now()
 	for i := 0; i < len(customers); i += batchSize {
 		end := i + batchSize
 		if end > len(customers) {
@@ -181,6 +182,7 @@ func (r *CustomerRepository) SaveRange(ctx context.Context, customers []*custome
 
 		tinserted = end
 	}
-	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(customers), tinserted))
+	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
+		logger.Field{Key: "process_time", Value: time.Since(start).String()})
 	return nil
 }

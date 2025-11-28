@@ -110,6 +110,7 @@ func (r *HirarkiRepository) Save(ctx context.Context, h *hirarki.Hirarki) error 
 func (r *HirarkiRepository) SaveRange(ctx context.Context, hs []*hirarki.Hirarki) error {
 	batchSize := r.config.DBBatchSize
 	tinserted := 0
+	start := time.Now()
 	for i := 0; i < len(hs); i += batchSize {
 		end := i + batchSize
 		if end > len(hs) {
@@ -160,7 +161,8 @@ func (r *HirarkiRepository) SaveRange(ctx context.Context, hs []*hirarki.Hirarki
 		}
 		tinserted = end
 	}
-	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(hs), tinserted))
+	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
+		logger.Field{Key: "process_time", Value: time.Since(start).String()})
 
 	return nil
 }

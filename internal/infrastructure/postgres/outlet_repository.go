@@ -107,6 +107,7 @@ func (r *MasterOutletRepository) Save(ctx context.Context, m *masteroutlet.Maste
 func (r *MasterOutletRepository) SaveRange(ctx context.Context, ms []*masteroutlet.MasterOutlet) error {
 	batchSize := r.config.DBBatchSize
 	tinserted := 0
+	start := time.Now()
 	for i := 0; i < len(ms); i += batchSize {
 		end := i + batchSize
 		if end > len(ms) {
@@ -154,7 +155,8 @@ func (r *MasterOutletRepository) SaveRange(ctx context.Context, ms []*masteroutl
 		}
 	}
 
-	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(ms), tinserted))
+	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
+		logger.Field{Key: "process_time", Value: time.Since(start).String()})
 
 	return nil
 }

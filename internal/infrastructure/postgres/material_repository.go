@@ -116,6 +116,7 @@ func (r *MaterialMasterRepository) Save(ctx context.Context, m *materialmaster.M
 func (r *MaterialMasterRepository) SaveRange(ctx context.Context, materials []*materialmaster.MaterialMaster) error {
 	batchSize := r.config.DBBatchSize
 	tinserted := 0
+	start := time.Now()
 	for i := 0; i < len(materials); i += batchSize {
 		end := i + batchSize
 		if end > len(materials) {
@@ -171,6 +172,7 @@ func (r *MaterialMasterRepository) SaveRange(ctx context.Context, materials []*m
 		tinserted = end
 	}
 
-	r.logger.Info(ctx, fmt.Sprintf("%d of %d rows successfully inserted", len(materials), tinserted))
+	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
+		logger.Field{Key: "process_time", Value: time.Since(start).String()})
 	return nil
 }

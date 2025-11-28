@@ -56,5 +56,6 @@ func (s *Service) saveData(ctx context.Context, data []*hirarki.Hirarki) error {
 		s.logger.Info(ctx, "Existing data found for the same month; old records will be removed")
 		s.repo.RemoveThisMonthData(ctx)
 	}
+
 	return s.repo.SaveRange(ctx, data)
 }
