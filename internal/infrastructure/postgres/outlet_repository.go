@@ -6,19 +6,28 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	masteroutlet "github.com/mariotiara/sfe-data-pipe/internal/domain/master_outlet"
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type MasterOutletRepository struct {
-	logger logger.Logger
-	db     *sql.DB
-	config *configs.Config
+	logger  logger.Logger
+	db      *sql.DB
+	config  *configs.Config
+	pgxPool *pgxpool.Pool
 }
 
-func NewMasterOutletRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *MasterOutletRepository {
-	return &MasterOutletRepository{db: db, config: config, logger: logger}
+func NewMasterOutletRepository(db *sql.DB, config *configs.Config, logger logger.Logger) (*MasterOutletRepository, error) {
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, config.ConnString) // e.g. "postgres://user:pass@localhost/db"
+	if err != nil {
+		return nil, err
+	}
+	return &MasterOutletRepository{db: db, pgxPool: pool, config: config, logger: logger}, nil
 }
 
 func (r *MasterOutletRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
@@ -104,59 +113,79 @@ func (r *MasterOutletRepository) Save(ctx context.Context, m *masteroutlet.Maste
 	return tx.Commit()
 }
 
-func (r *MasterOutletRepository) SaveRange(ctx context.Context, ms []*masteroutlet.MasterOutlet) error {
+func (r *MasterOutletRepository) SaveRange(
+	ctx context.Context,
+	ms []*masteroutlet.MasterOutlet,
+) error {
+
 	batchSize := r.config.DBBatchSize
-	tinserted := 0
 	start := time.Now()
+	totalInserted := 0
+
 	for i := 0; i < len(ms); i += batchSize {
-		end := i + batchSize
-		if end > len(ms) {
-			end = len(ms)
+		batchStart := i
+		batchEnd := i + batchSize
+		if batchEnd > len(ms) {
+			batchEnd = len(ms)
 		}
-		batch := ms[i:end]
 
-		tx, err := r.db.BeginTx(ctx, nil)
+		batch := ms[batchStart:batchEnd]
+		batchNumber := (i / batchSize) + 1
+		batchStartTime := time.Now()
+
+		conn, err := r.pgxPool.Acquire(ctx)
 		if err != nil {
-			return fmt.Errorf("begin tx: %w", err)
+			r.logger.Error(ctx, "failed to acquire pgx connection", err,
+				logger.Field{Key: "batch_number", Value: batchNumber},
+				logger.Field{Key: "error", Value: err.Error()},
+			)
+			continue
 		}
 
-		stmt, err := tx.PrepareContext(ctx, `
-			INSERT INTO master_outlet (
-				customer_code, customer_name, channel, plant, branch_name,
-				nik_salesman, name_salesman, rayon_code, rayon, new_class,
-				call_plan_full_month, target_freq, terr_code, username
-			) VALUES (
-				$1, $2, $3, $4, $5,
-				$6, $7, $8, $9, $10,
-				$11, $12, $13, $14
-			)
-		`)
+		rowsInserted, err := conn.CopyFrom(
+			ctx,
+			pgx.Identifier{"master_outlet"},
+			[]string{
+				"customer_code", "customer_name", "channel", "plant", "branch_name",
+				"nik_salesman", "name_salesman", "rayon_code", "rayon", "new_class",
+				"call_plan_full_month", "target_freq", "terr_code", "username",
+			},
+			pgx.CopyFromSlice(len(batch), func(i int) ([]any, error) {
+				m := batch[i]
+				return []any{
+					m.CustomerCode, m.CustomerName, m.Channel, m.Plant, m.BranchName,
+					m.NIKSalesman, m.NameSalesman, m.RayonCode, m.Rayon, m.NewClass,
+					m.CallPlanFullMonth, m.TargetFreq, m.TerrCode, m.Username,
+				}, nil
+			}),
+		)
+
+		conn.Release()
+
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("prepare stmt: %w", err)
-		}
-
-		for _, m := range batch {
-			_, err := stmt.ExecContext(ctx,
-				m.CustomerCode, m.CustomerName, m.Channel, m.Plant, m.BranchName,
-				m.NIKSalesman, m.NameSalesman, m.RayonCode, m.Rayon, m.NewClass,
-				m.CallPlanFullMonth, m.TargetFreq, m.TerrCode, m.Username,
+			r.logger.Error(ctx, "copy from batch failed", err,
+				logger.Field{Key: "batch_number", Value: batchNumber},
+				logger.Field{Key: "batch_start", Value: batchStart},
+				logger.Field{Key: "batch_end", Value: batchEnd},
+				logger.Field{Key: "batch_size", Value: len(batch)},
+				logger.Field{Key: "error", Value: err.Error()},
 			)
-			if err != nil {
-				stmt.Close()
-				tx.Rollback()
-				return fmt.Errorf("exec batch insert: %w", err)
-			}
+			continue
 		}
 
-		stmt.Close()
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit batch: %w", err)
-		}
+		totalInserted += int(rowsInserted)
+
+		r.logger.Info(ctx, "batch copy succeeded",
+			logger.Field{Key: "batch_number", Value: batchNumber},
+			logger.Field{Key: "inserted_rows", Value: rowsInserted},
+			logger.Field{Key: "batch_duration", Value: time.Since(batchStartTime).String()},
+		)
 	}
 
-	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
-		logger.Field{Key: "process_time", Value: time.Since(start).String()})
+	r.logger.Info(ctx, "bulk insert finished",
+		logger.Field{Key: "total_inserted", Value: totalInserted},
+		logger.Field{Key: "total_duration", Value: time.Since(start).String()},
+	)
 
 	return nil
 }

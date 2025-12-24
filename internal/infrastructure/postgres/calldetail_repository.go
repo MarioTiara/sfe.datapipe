@@ -6,19 +6,27 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mariotiara/sfe-data-pipe/configs"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type EZEngageCallDetailRepository struct {
-	logger logger.Logger
-	db     *sql.DB
-	config *configs.Config
+	logger  logger.Logger
+	db      *sql.DB
+	config  *configs.Config
+	pgxPool *pgxpool.Pool
 }
 
-func NewEZEngageCallDetailRepository(db *sql.DB, config *configs.Config, logger logger.Logger) *EZEngageCallDetailRepository {
-	return &EZEngageCallDetailRepository{db: db, config: config, logger: logger}
+func NewEZEngageCallDetailRepository(db *sql.DB, config *configs.Config, logger logger.Logger) (*EZEngageCallDetailRepository, error) {
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, config.ConnString) // e.g. "postgres://user:pass@localhost/db"
+	if err != nil {
+		return nil, err
+	}
+	return &EZEngageCallDetailRepository{db: db, pgxPool: pool, config: config, logger: logger}, nil
 }
 
 func (r *EZEngageCallDetailRepository) RemoveThisMonthData(ctx context.Context) (int, error) {
@@ -188,81 +196,107 @@ func (r *EZEngageCallDetailRepository) Save(ctx context.Context, e *ezengagecall
 	return tx.Commit()
 }
 
-func (r *EZEngageCallDetailRepository) SaveRange(ctx context.Context, details []*ezengagecalldetail.EZEngageCallDetail) error {
+func (r *EZEngageCallDetailRepository) SaveRange(
+	ctx context.Context,
+	details []*ezengagecalldetail.EZEngageCallDetail,
+) error {
+
 	batchSize := r.config.DBBatchSize
-	tinserted := 0
 	start := time.Now()
+	totalInserted := 0
+
 	for i := 0; i < len(details); i += batchSize {
-		end := i + batchSize
-		if end > len(details) {
-			end = len(details)
+		batchStart := i
+		batchEnd := i + batchSize
+		if batchEnd > len(details) {
+			batchEnd = len(details)
 		}
-		batch := details[i:end]
 
-		tx, err := r.db.BeginTx(ctx, nil)
+		batch := details[batchStart:batchEnd]
+		batchNumber := (i / batchSize) + 1
+		batchStartTime := time.Now()
+
+		conn, err := r.pgxPool.Acquire(ctx)
 		if err != nil {
-			return fmt.Errorf("begin tx: %w", err)
+			r.logger.Error(ctx, "failed to acquire pgx connection", err,
+				logger.Field{Key: "batch_number", Value: batchNumber},
+				logger.Field{Key: "error", Value: err.Error()},
+			)
+			continue
 		}
 
-		stmt, err := tx.PrepareContext(ctx, `
-			INSERT INTO ez_engage_call_detail (
-				date, team, position, business_type, sales_org, territory_code, sales_representative, status,
-				missed_call_remark, planned_unplanned, activity, otherwork_name, otherwork_note,
-				customer_code, customer_name, customer_ship_to_code, customer_ship_to_name, customer_city,
-				customer_class, frequency, principal, product, product_code, stock_inventory_quantity,
-				listed, shelf_stock, out_of_stock, location, shelf_space, share_of_space, no_of_facings,
-				no_of_photos_upload, product_enlistment, promotional_activity, sales_recommendation_from_ico,
-				person_in_charge, with_contract, start_date, end_date, virtual_images, presentation_duration_time,
-				presentation_file_name, perform_collection, mode_of_collection, placed_order, mode_of_order,
-				reason_of_not_using_ezrx, check_in_time, check_in_date, check_out_time, check_out_date, visit_duration,
-				travel_duration_time, pre_call_notes, post_call_notes, barrier_encountered, call_source, route_status,
-				modality_of_call, signature_image, signature_count, signature_start_time, signature_end_time,
-				signature_diff_time, longitude_data, latitude_data, actual_longitude_data, actual_latitude_data,
-				location_accuracy, geo_location_remarks, mode, work_with
-			) VALUES (
-				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-				$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,
-				$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54,$55,$56,$57,$58,$59,$60,
-				$61,$62,$63,$64,$65,$66,$67,$68,$69,$70,$71,$72
-			)
-		`)
+		rowsInserted, err := conn.CopyFrom(
+			ctx,
+			pgx.Identifier{"ez_engage_call_detail"},
+			[]string{
+				"date", "team", "position", "business_type", "sales_org", "territory_code",
+				"sales_representative", "status", "missed_call_remark", "planned_unplanned",
+				"activity", "otherwork_name", "otherwork_note", "customer_code", "customer_name",
+				"customer_ship_to_code", "customer_ship_to_name", "customer_city", "customer_class",
+				"frequency", "principal", "product", "product_code", "stock_inventory_quantity",
+				"listed", "shelf_stock", "out_of_stock", "location", "shelf_space", "share_of_space",
+				"no_of_facings", "no_of_photos_upload", "product_enlistment", "promotional_activity",
+				"sales_recommendation_from_ico", "person_in_charge", "with_contract", "start_date",
+				"end_date", "virtual_images", "presentation_duration_time", "presentation_file_name",
+				"perform_collection", "mode_of_collection", "placed_order", "mode_of_order",
+				"reason_of_not_using_ezrx", "check_in_time", "check_in_date", "check_out_time",
+				"check_out_date", "visit_duration", "travel_duration_time", "pre_call_notes",
+				"post_call_notes", "barrier_encountered", "call_source", "route_status",
+				"modality_of_call", "signature_image", "signature_count", "signature_start_time",
+				"signature_end_time", "signature_diff_time", "longitude_data", "latitude_data",
+				"actual_longitude_data", "actual_latitude_data", "location_accuracy",
+				"geo_location_remarks", "mode", "work_with",
+			},
+			pgx.CopyFromSlice(len(batch), func(i int) ([]any, error) {
+				e := batch[i]
+				return []any{
+					e.Date, e.Team, e.Position, e.BusinessType, e.SalesOrg, e.TerritoryCode,
+					e.SalesRepresentative, e.Status, e.MissedCallRemark, e.PlannedUnplanned,
+					e.Activity, e.OtherworkName, e.OtherworkNote, e.CustomerCode, e.CustomerName,
+					e.CustomerShipToCode, e.CustomerShipToName, e.CustomerCity, e.CustomerClass,
+					e.Frequency, e.Principal, e.Product, e.ProductCode, e.StockInventoryQuantity,
+					e.Listed, e.ShelfStock, e.OutOfStock, e.Location, e.ShelfSpace, e.ShareOfSpace,
+					e.NoOfFacings, e.NoOfPhotosUpload, e.ProductEnlistment, e.PromotionalActivity,
+					e.SalesRecommendationFromICO, e.PersonInCharge, e.WithContract, e.StartDate,
+					e.EndDate, e.VirtualImages, e.PresentationDurationTime, e.PresentationFileName,
+					e.PerformCollection, e.ModeOfCollection, e.PlacedOrder, e.ModeOfOrder,
+					e.ReasonOfNotUsingEzrx, e.CheckInTime, e.CheckInDate, e.CheckOutTime,
+					e.CheckOutDate, e.VisitDuration, e.TravelDurationTime, e.PreCallNotes,
+					e.PostCallNotes, e.BarrierEncountered, e.CallSource, e.RouteStatus,
+					e.ModalityOfCall, e.SignatureImage, e.SignatureCount, e.SignatureStartTime,
+					e.SignatureEndTime, e.SignatureDiffTime, e.LongitudeData, e.LatitudeData,
+					e.ActualLongitudeData, e.ActualLatitudeData, e.LocationAccuracy,
+					e.GeoLocationRemarks, e.Mode, e.WorkWith,
+				}, nil
+			}),
+		)
+
+		conn.Release()
+
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("prepare stmt: %w", err)
-		}
-
-		for _, e := range batch {
-			_, err := stmt.ExecContext(ctx,
-				e.Date, e.Team, e.Position, e.BusinessType, e.SalesOrg, e.TerritoryCode, e.SalesRepresentative, e.Status,
-				e.MissedCallRemark, e.PlannedUnplanned, e.Activity, e.OtherworkName, e.OtherworkNote,
-				e.CustomerCode, e.CustomerName, e.CustomerShipToCode, e.CustomerShipToName, e.CustomerCity,
-				e.CustomerClass, e.Frequency, e.Principal, e.Product, e.ProductCode, e.StockInventoryQuantity,
-				e.Listed, e.ShelfStock, e.OutOfStock, e.Location, e.ShelfSpace, e.ShareOfSpace, e.NoOfFacings,
-				e.NoOfPhotosUpload, e.ProductEnlistment, e.PromotionalActivity, e.SalesRecommendationFromICO,
-				e.PersonInCharge, e.WithContract, e.StartDate, e.EndDate, e.VirtualImages, e.PresentationDurationTime,
-				e.PresentationFileName, e.PerformCollection, e.ModeOfCollection, e.PlacedOrder, e.ModeOfOrder,
-				e.ReasonOfNotUsingEzrx, e.CheckInTime, e.CheckInDate, e.CheckOutTime, e.CheckOutDate, e.VisitDuration,
-				e.TravelDurationTime, e.PreCallNotes, e.PostCallNotes, e.BarrierEncountered, e.CallSource, e.RouteStatus,
-				e.ModalityOfCall, e.SignatureImage, e.SignatureCount, e.SignatureStartTime, e.SignatureEndTime,
-				e.SignatureDiffTime, e.LongitudeData, e.LatitudeData, e.ActualLongitudeData, e.ActualLatitudeData,
-				e.LocationAccuracy, e.GeoLocationRemarks, e.Mode, e.WorkWith,
+			r.logger.Error(ctx, "copy from batch failed", err,
+				logger.Field{Key: "batch_number", Value: batchNumber},
+				logger.Field{Key: "batch_start", Value: batchStart},
+				logger.Field{Key: "batch_end", Value: batchEnd},
+				logger.Field{Key: "batch_size", Value: len(batch)},
+				logger.Field{Key: "error", Value: err.Error()},
 			)
-			if err != nil {
-				stmt.Close()
-				tx.Rollback()
-				return fmt.Errorf("exec batch insert: %w", err)
-			}
+			continue
 		}
 
-		stmt.Close()
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit batch: %w", err)
-		}
+		totalInserted += int(rowsInserted)
 
-		tinserted = end
+		r.logger.Info(ctx, "batch copy succeeded",
+			logger.Field{Key: "batch_number", Value: batchNumber},
+			logger.Field{Key: "inserted_rows", Value: rowsInserted},
+			logger.Field{Key: "batch_duration", Value: time.Since(batchStartTime).String()},
+		)
 	}
 
-	r.logger.Info(ctx, fmt.Sprintf("%d rows successfully inserted", tinserted),
-		logger.Field{Key: "process_time", Value: time.Since(start).String()})
+	r.logger.Info(ctx, "bulk insert finished",
+		logger.Field{Key: "total_inserted", Value: totalInserted},
+		logger.Field{Key: "total_duration", Value: time.Since(start).String()},
+	)
+
 	return nil
 }

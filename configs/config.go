@@ -18,6 +18,10 @@ type Config struct {
 	SalesFEPath        string
 	ArchivePath        string
 	DBBatchSize        int
+	SFT_Host           string
+	SFT_Port           int
+	SFT_Username       string
+	SFTP_Password      string
 }
 
 func Load() (*Config, error) {
@@ -36,6 +40,10 @@ func Load() (*Config, error) {
 		SalesFEPath:        getEnv("SalesFEPath"),
 		ArchivePath:        getEnv("ArchivePath"),
 		DBBatchSize:        toInt(getEnv("DB_BATCHSIZE")),
+		SFT_Host:           getEnv("SFT_Host"),
+		SFT_Port:           toInt(getEnv("SFT_Port")),
+		SFT_Username:       getEnv("SFT_Username"),
+		SFTP_Password:      getEnv("SFTP_Password"),
 	}, nil
 }
 
