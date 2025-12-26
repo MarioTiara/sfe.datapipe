@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mariotiara/sfe-data-pipe/internal/application/ports"
+	"github.com/mariotiara/sfe-data-pipe/internal/domain/fileingestion"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/hirarki"
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
@@ -16,10 +17,18 @@ type Service struct {
 	fileSources   ports.FileSource
 	mapper        HirarkiMapper
 	tabularReader ports.TabularFileReader
+	policy        fileingestion.RegexFileNamePolicy
+	format        fileingestion.FileNameFormat
 }
 
-func NewService(repo hirarki.Repository, fileSources ports.FileSource, tabularReader ports.TabularFileReader, mapper HirarkiMapper, logger logger.Logger) *Service {
-	return &Service{repo: repo, fileSources: fileSources, tabularReader: tabularReader, mapper: mapper, logger: logger}
+func NewService(repo hirarki.Repository,
+	fileSources ports.FileSource,
+	tabularReader ports.TabularFileReader,
+	mapper HirarkiMapper,
+	policy fileingestion.RegexFileNamePolicy,
+	format fileingestion.FileNameFormat,
+	logger logger.Logger) *Service {
+	return &Service{repo: repo, fileSources: fileSources, policy: policy, format: format, tabularReader: tabularReader, mapper: mapper, logger: logger}
 }
 
 func (s *Service) Run(ctx context.Context) error {

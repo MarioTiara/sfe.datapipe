@@ -7,7 +7,7 @@ import (
 )
 
 type FileNameFormat interface {
-	Parse(raw string)
+	Parse(raw string) (*IngestionFileName, error)
 }
 
 type PrefixPeriodFormat struct{}
