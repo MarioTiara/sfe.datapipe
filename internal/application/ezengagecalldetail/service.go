@@ -5,57 +5,75 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mariotiara/sfe-data-pipe/internal/application/datastream"
+	"github.com/mariotiara/sfe-data-pipe/internal/application/ports"
 	"github.com/mariotiara/sfe-data-pipe/internal/domain/ezengagecalldetail"
 	"github.com/mariotiara/sfe-data-pipe/internal/shared/logger"
 )
 
 type Service struct {
-	logger   logger.Logger
-	repo     ezengagecalldetail.Repository
-	streamer datastream.DataStream
-	mapper   CallDetailMapper
+	logger        logger.Logger
+	repo          ezengagecalldetail.Repository
+	fileSources   ports.FileSource
+	mapper        CallDetailMapper
+	tabularReader ports.TabularFileReader
 }
 
-func NewService(repo ezengagecalldetail.Repository, streamer datastream.DataStream, mapper CallDetailMapper, logger logger.Logger) *Service {
-	return &Service{repo: repo, streamer: streamer, mapper: mapper, logger: logger}
+func NewService(repo ezengagecalldetail.Repository, fileSources ports.FileSource, tabularReader ports.TabularFileReader, mapper CallDetailMapper, logger logger.Logger) *Service {
+	return &Service{repo: repo, fileSources: fileSources, tabularReader: tabularReader, mapper: mapper, logger: logger}
 }
 
 func (s *Service) Run(ctx context.Context) error {
 	// Stream rows from the loader
-	strat := time.Now()
-	s.logger.Info(ctx, "EZEngage Pipeline Started")
+	start := time.Now()
+	files, err := s.fileSources.List("Call Detailed eZEngage")
+	if err != nil {
+		s.logger.Error(ctx, "Error in loading file sources", err)
+		return err
+	}
 
-	rowsCh, loaderErrCh := s.streamer.StreamRows(ctx)
-
-	// Collect any loader errors in a separate goroutine
-	go func() {
-		for err := range loaderErrCh {
-			if err != nil {
-				s.logger.Error(ctx, "Loader error: %v\n", err)
-			}
+	s.logger.Info(ctx, fmt.Sprintf("Found %d files", len(files)))
+	fileCount := 0
+	rowCount := 0
+	for _, f := range files {
+		fstart := time.Now()
+		rowsCh, err := s.tabularReader.ReadRows(f.Name)
+		if err != nil {
+			s.logger.Error(ctx, "failed reads tabular data: %v", err)
+			continue
 		}
-	}()
+		// Map rows to entities (this returns a slice now)
+		entities, err := s.mapper.MapRowsToCallDetails(ctx, rowsCh)
+		if err != nil {
+			s.logger.Error(ctx, "failed to map rows: %v", err)
+			return err
+		}
 
-	// Map rows to entities (this returns a slice now)
-	entities, err := s.mapper.MapRowsToCallDetails(ctx, rowsCh)
-	if err != nil {
-		s.logger.Error(ctx, "failed to map rows: %v", err)
-		return err
-	}
-
-	s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
-
-	// Save entities to repository
-	err = s.saveData(ctx, entities)
-	if err != nil {
-		s.logger.Error(ctx, "EZEngage Failed", err,
-			logger.Field{Key: "process_time", Value: time.Since(strat).String()},
+		s.logger.Info(ctx, fmt.Sprintf("Total entities collected: %d\n", len(entities)))
+		// Save entities to repository
+		err = s.saveData(ctx, entities)
+		if err != nil {
+			s.logger.Error(ctx, "EZEngagecalldetail Pipeline Failded to insert to database", err,
+				logger.Field{Key: "process_time", Value: time.Since(start).String()},
+			)
+			continue
+		}
+		s.fileSources.Move(f.Name, "archieve")
+		s.logger.Info(
+			ctx, "Processing file done",
+			logger.Field{Key: "file_name", Value: f.Name},
+			logger.Field{Key: "process_time", Value: time.Since(fstart).String()},
 		)
-		return err
+
+		fileCount += 1
+		rowCount += len(entities)
+
 	}
 
-	s.logger.Info(ctx, "EZEngage Process Done", logger.Field{Key: "process_time", Value: time.Since(strat).String()})
+	s.logger.Info(ctx, "Hirarki Pipeline Process Done",
+		logger.Field{Key: "process_time", Value: time.Since(start).String()},
+		logger.Field{Key: "total_file_processed", Value: fileCount},
+		logger.Field{Key: "total_rows_processed", Value: rowCount},
+	)
 	return nil
 
 }

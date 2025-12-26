@@ -36,6 +36,7 @@ func NewApp(ctx context.Context, config *configs.Config) (*App, error) {
 		CustomerFEPipeline:   NewCustomerFEPipeline(db, config, log),
 		HirarkiPipeLine:      NewHirarkiPipeline(db, config, log),
 		MasterOutletPipeline: NewMasterOutletPipeline(db, config, log),
+		MaterialPipeLine:     NewMaterialMasterPipeline(db, config, log),
 		SalesFEPipeLine:      NewSalesFEPipeline(db, config, log),
 	}, nil
 }

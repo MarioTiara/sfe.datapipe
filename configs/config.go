@@ -3,8 +3,6 @@ package configs
 import (
 	"log"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -18,24 +16,18 @@ type Config struct {
 	MasterMaterialPath string
 	MasterOutletPath   string
 	SalesFEPath        string
+	ArchivePath        string
 	DBBatchSize        int
+	SFT_Host           string
+	SFT_Port           int
+	SFT_Username       string
+	SFTP_Password      string
 }
 
 func Load() (*Config, error) {
-	// Get the directory of the current source file
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Println("Warning: unable to get caller info")
-	}
 
-	basePath := filepath.Dir(filename)
-	// Adjust if your .env is inside "configs" folder
-	envPath := filepath.Join(basePath, ".env")
-
-	// Load the .env file
-	err := godotenv.Load(envPath)
-	if err != nil {
-		log.Printf("Warning: .env not found at %s: %v", envPath, err)
+	if err := godotenv.Load("configs/.env"); err != nil {
+		log.Printf("Warning: .env not %v", err)
 	}
 
 	return &Config{
@@ -46,7 +38,12 @@ func Load() (*Config, error) {
 		MasterMaterialPath: getEnv("MasterMaterialPath"),
 		MasterOutletPath:   getEnv("MasterOutletPath"),
 		SalesFEPath:        getEnv("SalesFEPath"),
+		ArchivePath:        getEnv("ArchivePath"),
 		DBBatchSize:        toInt(getEnv("DB_BATCHSIZE")),
+		SFT_Host:           getEnv("SFT_Host"),
+		SFT_Port:           toInt(getEnv("SFT_Port")),
+		SFT_Username:       getEnv("SFT_Username"),
+		SFTP_Password:      getEnv("SFTP_Password"),
 	}, nil
 }
 

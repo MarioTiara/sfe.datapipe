@@ -10,7 +10,10 @@ import (
 
 func NewPostgressDB(config *configs.Config) (*sql.DB, error) {
 	constr := config.ConnString
-	fmt.Println(constr)
+	if constr == "" {
+		return nil, fmt.Errorf("connetion string is empty")
+	}
+
 	db, err := sql.Open("postgres", constr)
 	if err != nil {
 		log.Fatal(err)
